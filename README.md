@@ -13,7 +13,7 @@ There are no options. Just invoke fake-swapon like so:
 
 	>sh ./fake-swapon.sh
 	
-fake-swapon will attempt to detect if swap already exists. This is done by checking /proc/meminfo. If no swap is found, then fake-swapon will attempt to create a swap file. On [CoreOS](https://coreos.com/) this will be accomplished via the [loop device] (http://en.wikipedia.org/wiki/Loop_device); on [CoreOS](https://coreos.com/) the script will create a swap file without the old fashioned way.
+fake-swapon will attempt to detect if swap already exists. This is done by checking /proc/meminfo. If no swap is found, then fake-swapon will attempt to create a swap file. On [CoreOS](https://coreos.com/) this will be accomplished via the [loop device](http://en.wikipedia.org/wiki/Loop_device); on [CoreOS](https://coreos.com/) the script will create a swap file without the old fashioned way.
 
 ## Limitations
 Cleanup needs to be performed manually. And the script will have to be re-run between reboots (the system fstab will not be modified).
