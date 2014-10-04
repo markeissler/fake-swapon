@@ -26,6 +26,17 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+# @TODO Implement options to free swap.
+#
+# NOTE: To remove loop device based swap you need to do the following:
+#
+# >swapoff /dev/loop0
+# >losetup -d /dev/loop0
+#
+# If you don't delete the loop device, the kernel will at some point remap the
+# vm back into the table.
+#
+
 # check if swap is enabled
 #
 checkswap() {
@@ -73,7 +84,7 @@ if [[ $EUID -ne 0 ]]; then
   exit 100
 fi
 
-echo "Apply swap file hack..."
+echo "Analyzing system for swap status..."
 
 runos=""
 
@@ -140,16 +151,16 @@ if [ $? -ne 0 ]; then
   echo
   exit 1
 fi
-if [[ ${#swapconfig[@]} -eq 2 ]] && [[ ${swapconfig[0]} -gt 0 ]]; then
-  echo "ABORTING. Swap has already been enabled. Detected: ${swapconfig[0]} ${swapconfig[1]}"
+if [[ ${#swapconfig[@]} -eq 2 ]] && [[ ${swapconfig[SIZE]} -gt 0 ]]; then
+  echo "ABORTING. Swap has already been enabled. Detected: ${swapconfig[SIZE]} ${swapconfig[UNIT]}"
   echo "Nothing to do."
   echo
   exit 0
 fi
 
 if [[ "${osconfig[NAME]}" =~ "CoreOS" ]]; then
+  echo
   echo "Creating swap using the loop device method..."
-  echo "Freeing loop device."
   swapfile="/root/swap.1"
   swapdev=$(/usr/sbin/losetup -f)
   # check if a swapfile already exists, if not, create it
@@ -170,10 +181,11 @@ if [[ "${osconfig[NAME]}" =~ "CoreOS" ]]; then
   echo "Connecting swap to loop device."
   /usr/sbin/losetup ${swapdev} ${swapfile}
   echo "Formatting swap file."
-  /usr/sbin/mkswap ${swapdev}
+  /usr/sbin/mkswap ${swapdev} &> /dev/null
   echo "Enabling swap."
   /usr/sbin/swapon ${swapdev}
 elif [[ "${osconfig[NAME]}" =~ "CentOS" ]]; then
+  echo
   echo "Creating swap using the file system method..."
   swapfile="/root/swap.1"
   swapdev=${swapfile}
@@ -193,7 +205,7 @@ elif [[ "${osconfig[NAME]}" =~ "CentOS" ]]; then
     echo "Found a swap file at ${swapfile}"
   fi
   echo "Formatting swap file."
-  /usr/sbin/mkswap ${swapdev}
+  /usr/sbin/mkswap ${swapdev} &> /dev/null
   echo "Enabling swap."
   /usr/sbin/swapon ${swapdev}
 else
@@ -214,8 +226,8 @@ if [ $? -ne 0 ]; then
   echo
   exit 1
 fi
-if [[ ${#swapconfig[@]} -eq 2 ]] && [[ ${swapconfig[0]} -gt 0 ]]; then
-  echo "Swap has been enabled. Detected: ${swapconfig[0]} ${swapconfig[1]}"
+if [[ ${#swapconfig[@]} -eq 2 ]] && [[ ${swapconfig[SIZE]} -gt 0 ]]; then
+  echo "Swap has been enabled. Detected: ${swapconfig[SIZE]} ${swapconfig[UNIT]}"
   echo
   exit 0
 fi
