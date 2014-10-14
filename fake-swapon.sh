@@ -61,7 +61,6 @@ VERSION=2.0.0
 PROGNAME=`basename $0`
 
 # reset internal vars (do not touch these here)
-ADDDOCSET=0
 DEBUG=0
 
 # check if swap is enabled
