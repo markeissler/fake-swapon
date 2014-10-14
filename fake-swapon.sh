@@ -37,13 +37,40 @@
 # vm back into the table.
 #
 
+PATH=/usr/local/bin
+
+PATH_CAT="/usr/bin/cat"
+PATH_DD="/usr/bin/dd"
+PATH_STAT="/usr/bin/stat"
+PATH_SED="/usr/bin/sed"
+
+PATH_MKSWAP="/usr/sbin/mkswap"
+PATH_SWAPON="/usr/sbin/swapon"
+
+# Loop device support (required for CoreOS)
+#
+PATH_LOSETUP="/usr/sbin/losetup"
+
+# Swap directory
+#
+PATH_SWAPDIR="/root/swap"
+
+
+###### NO SERVICABLE PARTS BELOW ######
+VERSION=2.0.0
+PROGNAME=`basename $0`
+
+# reset internal vars (do not touch these here)
+ADDDOCSET=0
+DEBUG=0
+
 # check if swap is enabled
 #
 checkswap() {
   local array="$1"
   declare -g -A "$array"
 
-  resp=$(/usr/bin/cat /proc/meminfo | sed -En "s/^SwapTotal:[\ ]*([0-9]*)[\ ]*([a-zA-Z]{2,2})/\1@\2/p" )
+  resp=$(${PATH_CAT} /proc/meminfo | ${PATH_SED} -En "s/^SwapTotal:[\ ]*([0-9]*)[\ ]*([a-zA-Z]{2,2})/\1@\2/p" )
   rslt=$?
   if [ ${rslt} -ne 0 ]; then
     eval "$array[SIZE]=unknown"
@@ -129,22 +156,6 @@ fi
 
 echo "Detected Linux variant: ${osconfig[NAME]} [${osconfig[VERSION]}]"
 
-# check if swap is already enabled
-# resp=$(/usr/bin/cat /proc/meminfo | sed -En "s/^SwapTotal:[\ ]*([0-9]*)[\ ]*([a-zA-Z]{2,2})/\1@\2/p" )
-# rslt=$?
-# if [ ${rslt} -ne 0 ]; then
-#   echo "ABORTING. Unable to determine swap status."
-#   echo
-#   exit 1
-# fi
-# swaparray=(${resp//@/ })
-# if [[ ${#swaparray[@]} -eq 2 ]] && [[ ${swaparray[0]} -gt 0 ]]; then
-#   echo "ABORTING. Swap has already been enabled. Detected: ${swaparray[0]} ${swaparray[1]}"
-#   echo "Nothing to do."
-#   echo
-#   exit 0
-# fi
-
 checkswap swapconfig
 if [ $? -ne 0 ]; then
   echo "ABORTING. Unable to determine swap status."
@@ -161,14 +172,14 @@ fi
 if [[ "${osconfig[NAME]}" =~ "CoreOS" ]]; then
   echo
   echo "Creating swap using the loop device method..."
-  swapfile="/root/swap.1"
-  swapdev=$(/usr/sbin/losetup -f)
+  swapfile="${PATH_SWAPDIR}/swap.1"
+  swapdev=$(${PATH_LOSETUP} -f)
   # check if a swapfile already exists, if not, create it
-  resp=$(/usr/bin/stat ${swapfile} &> /dev/null)
+  resp=$(${PATH_STAT} ${swapfile} &> /dev/null)
   rslt=$?
   if [[ ${rslt} -ne 0 ]]; then
     echo "No swapfile detected. Creating it..."
-    /usr/bin/dd if=/dev/zero of=${swapfile} bs=1M count=1024
+    ${PATH_DD} if=/dev/zero of=${swapfile} bs=1M count=1024
     if [ $? -ne 0 ]; then
       echo "ABORTING. Couldn't create swap file: ${swapfile}"
       echo
@@ -179,22 +190,22 @@ if [[ "${osconfig[NAME]}" =~ "CoreOS" ]]; then
     echo "Found a swap file at ${swapfile}"
   fi
   echo "Connecting swap to loop device."
-  /usr/sbin/losetup ${swapdev} ${swapfile}
+  ${PATH_LOSETUP} ${swapdev} ${swapfile}
   echo "Formatting swap file."
-  /usr/sbin/mkswap ${swapdev} &> /dev/null
+  ${PATH_MKSWAP} ${swapdev} &> /dev/null
   echo "Enabling swap."
-  /usr/sbin/swapon ${swapdev}
+  ${PATH_SWAPON} ${swapdev}
 elif [[ "${osconfig[NAME]}" =~ "CentOS" ]]; then
   echo
   echo "Creating swap using the file system method..."
-  swapfile="/root/swap.1"
+  swapfile="${PATH_SWAPDIR}/swap.1"
   swapdev=${swapfile}
   # check if a swapfile already exists, if not, create it
-  resp=$(/usr/bin/stat ${swapfile} &> /dev/null)
+  resp=$(${PATH_STAT} ${swapfile} &> /dev/null)
   rslt=$?
   if [[ ${rslt} -ne 0 ]]; then
     echo "No swapfile detected. Creating it..."
-    /usr/bin/dd if=/dev/zero of=${swapfile} bs=1M count=1024
+    ${PATH_DD} if=/dev/zero of=${swapfile} bs=1M count=1024
     if [ $? -ne 0 ]; then
       echo "ABORTING. Couldn't create swap file: ${swapfile}"
       echo
@@ -205,9 +216,9 @@ elif [[ "${osconfig[NAME]}" =~ "CentOS" ]]; then
     echo "Found a swap file at ${swapfile}"
   fi
   echo "Formatting swap file."
-  /usr/sbin/mkswap ${swapdev} &> /dev/null
+  ${PATH_MKSWAP} ${swapdev} &> /dev/null
   echo "Enabling swap."
-  /usr/sbin/swapon ${swapdev}
+  ${PATH_SWAPON} ${swapdev}
 else
   echo "ABORTING. Swap creation strategy not implemented for this OS."
   echo
