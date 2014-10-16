@@ -194,87 +194,90 @@ checkswap() {
 
 # get list of our managed loop device swap files
 #
-# @FIXME: Like getWiredSwap, this function should list the contents of SWAPDIR
-#   in the outer while loop.
-#
-_getLoopSwap() {
+_getSwapList() {
   local array="$1"
   declare -g -A "$array"
+  local swapfile
   local lpdevice sizelimit offset autoclear roflag backfile
   local swdevice type size used prio
   local count=0
+  local lcount scount
   local resp rslt
+  local styparray
 
   # init array
   eval "$array[SRECCNT]=${count}"
-  eval "$array[SRECSIZ]=6"
+  eval "$array[SRECSIZ]=7"
   eval "$array[SRECOFF]=3"
 
   # get swap device and file information
-  while IFS=" " read -r lpdevice sizelimit offset autoclear roflag backfile; do
-    resp=$(echo ${backfile} | ${PATH_SED} -E "s:^${PATH_SWAPDIR}[/]?/swap\.(.*)$:\1:")
-    rslt=$?
-    if [[ -n "${resp}" ]] && [[ ${rslt} -eq 0 ]]; then
-      (( count++ ))
-      (( _idx=count-1 ))
-      # SRECCNT: number of swap records
-      # SRECSIZ: number of fields in each swap record
-      # SRECOFF: offset from header records
-      eval "$array[SRECCNT]=${count}"
-      eval "$array[SRECSIZ]=3"
-      eval "$array[SRECOFF]=3"
-      eval "$array[${_idx},SWID]=${resp}"
-      eval "$array[${_idx},FILE]=${backfile}"
-      eval "$array[${_idx},LDEV]=${lpdevice}"
-
-      # get swap size information
-      while IFS=" " read -r swdevice type size used prio; do
-        eval "$array[${_idx},SIZE]=${size}"
-        eval "$array[${_idx},USED]=${used}"
-        eval "$array[${_idx},TYPE]=${type}"
-      done <<< "$(${PATH_SWAPON} --show --noheadings)"
+  while IFS=" " read -r swapfile; do
+    resp=$(echo ${swapfile} | ${PATH_SED} -Ee "/(lp.swap|wd.swap)/!d" -e "s:^/root/swap[/]?/(wd.swap|lp.swap).(.*)$:\2@\1:")
+    if [ "${DEBUG}" -ne 0 ]; then
+      echo "DEBUG: swapfile: $swapfile"
+      echo "DEBUG: id found: $resp"
     fi
-  done <<< "$(${PATH_LOSETUP} --list --noheadings)"
-}
-
-# get list of our managed regular device swap files
-#
-_getWireSwap() {
-  local array="$1"
-  declare -g -A "$array"
-  local lpdevice sizelimit offset autoclear roflag backfile
-  local swdevice type size used prio
-  local count=0
-  local resp rslt
-
-  # init array
-  eval "$array[SRECCNT]=${count}"
-  eval "$array[SRECSIZ]=6"
-  eval "$array[SRECOFF]=3"
-
-  # get swap device and file information
-  while IFS=" " read -r backfile; do
-    resp=$(echo ${backfile} | ${PATH_SED} -E "s:^${PATH_SWAPDIR}[/]?/wd.swap\.(.*)$:\1:")
     rslt=$?
     if [[ -n "${resp}" ]] && [[ ${rslt} -eq 0 ]]; then
+
+      # split SWID and STYP into an array, fix STYPE
+      styparray=(${resp//@/ })
+      if [[ ${#styparray[@]} -eq 2 ]] && [[ ! -z ${styparray[0]} ]] && [[ ! -z ${styparray[1]} ]]; then
+        if [[ "${styparray[1]}" = "lp.swap" ]]; then
+          styparray[1]="loop"
+        elif [[ "${styparray[1]}" = "wd.swap" ]]; then
+          styparray[1]="fsys"
+        fi
+      else
+        styparray[0]="unk"
+        styparray[1]="unk"
+      fi
+
+      if [ "${DEBUG}" -ne 0 ]; then
+        echo "DEBUG: swaptype: ${styparray[1]}"
+        echo "DEBUG:     swid: ${styparray[0]}"
+      fi
+
       (( count++ ))
       (( _idx=count-1 ))
+
       # SRECCNT: number of swap records
       # SRECSIZ: number of fields in each swap record
       # SRECOFF: offset from header records
       eval "$array[SRECCNT]=${count}"
-      eval "$array[${_idx},SWID]=${resp}"
-      eval "$array[${_idx},FILE]=${backfile}"
-      eval "$array[${_idx},WDEV]=${backfile}"
+      eval "$array[${_idx},SWID]=${styparray[0]}"
+      eval "$array[${_idx},STYP]=${styparray[1]}"
+      eval "$array[${_idx},FILE]=${swapfile}"
+
+      # retrieve loop device information
+      if [[ "${styparray[1]}" = "loop" ]]; then
+        lcount=0
+        while IFS=" " read -r lpdevice sizelimit offset autoclear roflag backfile; do
+          if [[ $(( lcount++ )) -lt 1 ]]; then
+            continue
+          fi
+          if [[ "${swapfile}" = "${backfile}" ]]; then
+            eval "$array[${_idx},WDEV]=${lpdevice}"
+          fi
+          (( lcount++ ))
+        done <<< "$(${PATH_LOSETUP} --list)"
+      else
+        eval "$array[${_idx},WDEV]=${swapfile}"
+      fi
 
       # get swap size information
-      while IFS=" " read -r device type size used prio; do
-        if [[ ${device} = ${backfile} ]]; then
+      scount=0
+      while IFS=" " read -r swdevice type size used prio; do
+        if [[ $(( scount++ )) -lt 1 ]]; then
+          continue
+        fi
+        if [[ "${swapfile}" = "${swdevice}" ]]; then
           eval "$array[${_idx},SIZE]=${size}"
           eval "$array[${_idx},USED]=${used}"
           eval "$array[${_idx},TYPE]=${type}"
         fi
-      done <<< "$(${PATH_SWAPON} --show --noheadings)"
+        (( scount++ ))
+      done <<< "$(${PATH_SWAPON} --show)"
     fi
   done <<< "$(${PATH_LS} -d1 ${PATH_SWAPDIR}/*)"
 }
@@ -379,7 +382,7 @@ if [ -n "${cli_FORCEEXEC}" ]; then
   FORCEEXEC=${cli_FORCEEXEC};
 fi
 
-echo "Analyzing system for swap status..."
+echo "Analyzing system for fake-swap status..."
 
 runos=""
 
@@ -537,19 +540,15 @@ fi
 # List swap
 #
 if [[ ${LISTSWAP} -ne 0 ]]; then
-  if [[ "${osconfig[NAME]}" =~ "CoreOS" ]]; then
-    printf "Swap Id     Type        Size    Used\n"
-    _getLoopSwap swaplist
-    for((i=0; i<${swaplist[SRECCNT]}; i++)); do
-      printf "%-10s  %-10s  %-6s  %-6s\n" "${swaplist[$i,SWID]}" "${swaplist[$i,TYPE]}" "${swaplist[$i,SIZE]}" "${swaplist[$i,USED]}"
-    done
-  else
-    printf "Swap Id     Type        Size    Used\n"
-    _getWireSwap swaplist
-    for((i=0; i<${swaplist[SRECCNT]}; i++)); do
-      printf "%-10s  %-10s  %-6s  %-6s\n" "${swaplist[$i,SWID]}" "${swaplist[$i,TYPE]}" "${swaplist[$i,SIZE]}" "${swaplist[$i,USED]}"
-    done
-  fi
+  printf "Swap Id     Type        Size    Used\n"
+  _getSwapList swaplist
+  for((i=0; i<${swaplist[SRECCNT]}; i++)); do
+    swaptype="${swaplist[$i,TYPE]}"
+    if [[ "${swaplist[$i,STYP]}" = "loop" ]]; then
+      swaptype="${swaptype} (loop)"
+    fi
+    printf "%-10s  %-10s  %-6s  %-6s\n" "${swaplist[$i,SWID]}" "${swaptype}" "${swaplist[$i,SIZE]}" "${swaplist[$i,USED]}"
+  done
   echo
   exit 0
 fi
