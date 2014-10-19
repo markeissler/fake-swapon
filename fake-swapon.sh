@@ -74,6 +74,10 @@ FORCEEXEC=0
 ADDSWAP=0
 LISTSWAP=0
 REMOVESWAP=0
+SWAPSIZE=-1
+
+# defaults
+DEF_SWAPSIZE=1024
 
 #
 # FUNCTIONS
@@ -117,6 +121,7 @@ OPTIONS:
    -i, --swap-id                Swap id (as returned by "fake-swap --list-swap")
    -l, --list-swap              List swap managed by fake-swap
    -r, --remove-swap            Remove swap managed by fake-swap from vm pool
+   -s, --swap-size              Size of swap to add (use with --add-swap)
    -d, --debug                  Turn debugging on (increases verbosity)
    -f, --force                  Execute without user prompt
    -h, --help                   Show this message
@@ -140,6 +145,7 @@ OPTIONS:
    -i                           Swap id (as returned by "fake-swap -l")
    -l                           List swap managed by fake-swap
    -r                           Remove swap managed by fake-swap from vm pool
+   -s                           Size of swap to add (use with -a)
    -d                           Turn debugging on (increases verbosity)
    -f                           Execute without user prompt
    -h                           Show this message
@@ -408,14 +414,21 @@ getUniqSWID() {
 #
 # Add swap to the system.
 #
+# @param { int } [ optional ] Size of swap file in megabytes (-1 for default)
 # @param { arrayref } [optional] Reference to an existing swapconfig array
 # @param { arrayref } [optional] Reference to an existing swaplist array
 #
 addswap() {
+  # swapsize vars
+  local __swapsize=${DEF_SWAPSIZE}
+  if [ -n "${1}"] && [ ${1} -gt ${__swapsize} ]; then
+    __swapsize=${1}
+  fi
+
   # swapconfig vars
   local __swapconfig="gSwapConfig"
   if [ -n "${1}" ]; then
-    __swapconfig=${1}
+    __swapconfig=${2}
   fi
   declare -g -A "$__swapconfig"
 
@@ -425,8 +438,8 @@ addswap() {
 
   # swaplist vars
   local __swaplist="gSwapList"
-  if [ -n "${2}" ]; then
-    __swaplist=${2}
+  if [ -n "${3}" ]; then
+    __swaplist=$3}
   fi
   declare -g -A "$__swaplist"
 
@@ -508,7 +521,7 @@ addswap() {
     rslt=$?
     if [[ ${rslt} -ne 0 ]]; then
       echo "No swapfile detected. Creating it..."
-      ${PATH_DD} if=/dev/zero of=${swapfile} bs=1M count=1024
+      ${PATH_DD} if=/dev/zero of=${swapfile} bs=1M count=${__swapsize}
       if [ $? -ne 0 ]; then
         echo "ABORTING. Couldn't create swap file: ${swapfile}"
         echo
@@ -536,7 +549,7 @@ addswap() {
     rslt=$?
     if [[ ${rslt} -ne 0 ]]; then
       echo "No swapfile detected. Creating it..."
-      ${PATH_DD} if=/dev/zero of=${swapfile} bs=1M count=1024
+      ${PATH_DD} if=/dev/zero of=${swapfile} bs=1M count=${__swapsize}
       if [ $? -ne 0 ]; then
         echo "ABORTING. Couldn't create swap file: ${swapfile}"
         echo
@@ -606,7 +619,12 @@ listswap() {
   echo
 }
 
-# remove swap
+# removeswap()
+#
+# Remove swap from the system.
+#
+# @param { arrayref } [optional] Reference to an existing swapconfig array
+# @param { arrayref } [optional] Reference to an existing swaplist array
 #
 removeswap() {
   echo "$FUNCNAME: not impl"
@@ -637,6 +655,7 @@ readconfig() {
 #   --swap-id, i
 #   --list-swap, l
 #   --remove-swap, r
+#   --swap-size, s
 #   --debug, d
 #   --force, f
 #   --help, h
@@ -647,12 +666,12 @@ ${PATHgetOPT} -T > /dev/null
 if [ $? -eq 4 ]; then
   # GNU enhanced getopt is available
   PROGNAME=$(${PATH_BNAME} $0)
-  params="$(${PATHgetOPT} --name "$PROGNAME" --long add-swap,swap-id:,list-swap,remove-swap,force,help,version,debug --options ai:lrfhvd -- "$@")"
+  params="$(${PATHgetOPT} --name "$PROGNAME" --long add-swap,swap-id:,list-swap,remove-swap,swap-size:,force,help,version,debug --options ai:lrs:fhvd -- "$@")"
 else
   # Original getopt is available
   GETOPT_OLD=1
   PROGNAME=$(${PATH_BNAME} $0)
-  params="$(${PATHgetOPT} ai:lrfhvd "$@")"
+  params="$(${PATHgetOPT} ai:lrs:fhvd "$@")"
 fi
 
 # check for invalid params passed; bail out if error is set.
@@ -670,6 +689,7 @@ while [ $# -gt 0 ]; do
     -i | --swap-id)         cli_SWAPID="$2"; shift;;
     -l | --list-swap)       cli_LISTSWAP=1; LISTSWAP=${cli_LISTSWAP};;
     -r | --remove-swap)     cli_REMOVESWAP=1; REMOVESWAP=${cli_REMOVESWAP};;
+    -s | --swap-size)       cli_SWAPSIZE="$2"; shift;;
     -d | --debug)           cli_DEBUG=1; DEBUG=${cli_DEBUG};;
     -f | --force)           cli_FORCEEXEC=1;;
     -v | --version)         version; exit;;
@@ -692,6 +712,26 @@ fi
 #
 if [ -n "${cli_FORCEEXEC}" ]; then
   FORCEEXEC=${cli_FORCEEXEC};
+fi
+
+if [ -n "${cli_SWAPSIZE}" ]; then
+  if [[ ${cli_SWAPSIZE} =~ ^-?[0-9]+$ ]]; then
+    SWAPSIZE=${cli_SWAPSIZE}
+    if [ "${DEBUG}" -ne 0 ]; then
+      echo "DEBUG: swapsize: ${SWAPSIZE}"
+    fi
+    if [[ ${SWAPSIZE} -lt 1024 ]]; then
+      echo
+      echo "WARNING: Minimum swap size is 1024. Specified swap size ignored."
+      echo
+    fi
+  else
+    echo
+    echo "ABORTING. Invalid swap size specified: \"${cli_SWAPSIZE}\""
+    echo
+    usage
+    exit 1
+  fi
 fi
 
 echo "Analyzing system for fake-swap status..."
@@ -743,20 +783,32 @@ echo "Detected Linux variant: ${osconfig[NAME]} [${osconfig[VERSION]}]"
 # Add swap
 #
 
-# -Default
-if [[ ${ADDSWAP} -ne 0 ]]; then
+if [[ ${ADDSWAP} -ne 0 ]] && [[ ${SWAPSIZE} -gt 0 ]]; then
+  #
+  # -Additional (-a with -s option)
+  #
+  addswap ${SWAPSIZE}
+
+  exit 0
+else if [[ ${ADDSWAP} -ne 0 ]]; then
+  #
+  # -Default
+  #
   addswap
 
   exit 0
 fi
-
-# -Additional (-a with -s option)
 
 #
 # Remove swap
 #
 
 # -All swap
+if [[ ${REMOVESWAP} -ne 0 ]]; then
+  removeswap
+
+  exit 0
+fi
 
 # -Specific swap (-r with -i option)
 
