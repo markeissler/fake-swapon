@@ -414,7 +414,7 @@ getUniqSWID() {
   echo $checkswid
 }
 
-# addswap()
+# addSwap()
 #
 # Add swap to the system.
 #
@@ -422,7 +422,7 @@ getUniqSWID() {
 # @param { arrayref } [optional] Reference to an existing swapconfig array
 # @param { arrayref } [optional] Reference to an existing swaplist array
 #
-addswap() {
+addSwap() {
   # swapsize vars
   local __swapsize=${DEF_SWAPSIZE}
   if [ -n "${1}" ] && [ ${1} -gt ${__swapsize} ]; then
@@ -612,7 +612,7 @@ addswap() {
   fi
 }
 
-# removeswap()
+# removeSwap()
 #
 # Remove swap from the system.
 #
@@ -620,7 +620,7 @@ addswap() {
 # @param { arrayref } [optional] Reference to an existing swapconfig array
 # @param { arrayref } [optional] Reference to an existing swaplist array
 #
-removeswap() {
+removeSwap() {
   # swapsize vars
   local __swapid_target=""
   if [ -n "${1}" ] && [ ${#1} -eq ${SWAPIDLEN} ]; then
@@ -972,14 +972,14 @@ if [[ ${ADDSWAP} -ne 0 ]] && [[ ${SWAPSIZE} -gt 0 ]]; then
   #
   # -Add specific sized swap (-a with -s option)
   #
-  addswap ${SWAPSIZE}
+  addSwap ${SWAPSIZE}
 
   exit 0
 elif [[ ${ADDSWAP} -ne 0 ]]; then
   #
   # -Add default sized swap
   #
-  addswap
+  addSwap
 
   exit 0
 fi
@@ -992,14 +992,14 @@ if [[ ${REMOVESWAP} -ne 0 ]] && [[ -n "${SWAPID}" ]]; then
   #
   # -Remove specific swap (-r with -i option)
   #
-  removeswap ${SWAPID}
+  removeSwap ${SWAPID}
 
   exit 0
 elif [[ ${REMOVESWAP} -ne 0 ]]; then
   #
   # -Remove all swap
   #
-  removeswap
+  removeSwap
 
   exit 0
 fi
