@@ -577,6 +577,7 @@ addswap() {
   echo
 
   # check if our work was a success
+  local __swapconfig_size_old=${__swapconfig_size}
   checkSwap $__swapconfig
   if [ $? -ne 0 ]; then
     echo "ABORTING. Unable to determine swap status."
@@ -594,10 +595,159 @@ addswap() {
   __swapconfig_unit="\${${__swapconfig}[UNIT]}"
   __swapconfig_unit=$(eval "${PATH_EXPR} ${__swapconfig_unit}")
 
-  if [[ ${__swapconfig_reccnt} -eq 1 ]] && [[ ${__swapconfig_size} -gt 0 ]]; then
-    echo "Swap has been enabled. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
+  if [[ ${__swapconfig_reccnt} -eq 1 ]]; then
+    if [[ ${__swapconfig_size} -gt ${__swapconfig_size_old} ]]; then
+      echo "Swap has been updated. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
+      echo
+      exit 0
+    else
+      echo "Swap has NOT been updated. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
+      echo
+      exit 1
+    fi
+  fi
+}
+
+# removeswap()
+#
+# Remove swap from the system.
+#
+# @param { string } [ optional ] Id of swap file to remove
+# @param { arrayref } [optional] Reference to an existing swapconfig array
+# @param { arrayref } [optional] Reference to an existing swaplist array
+#
+removeswap() {
+  # swapsize vars
+  local __swapid=""
+  if [ -n "${1}"] && [ ${#1} -eq 5 ]; then
+    __swapid=${1}
+  fi
+
+  # swapconfig vars
+  local __swapconfig="gSwapConfig"
+  if [ -n "${1}" ]; then
+    __swapconfig=${2}
+  fi
+  declare -g -A "$__swapconfig"
+
+  local __swapconfig_reccnt
+  local __swapconfig_size
+  local __swapconfig_unit
+
+  # swaplist vars
+  local __swaplist="gSwapList"
+  if [ -n "${3}" ]; then
+    __swaplist=$3}
+  fi
+  declare -g -A "$__swaplist"
+
+  local __swaplist_reccnt
+  local __swaplist_item_file
+  local __swaplist_item_stype
+  local __swaplist_item_wdev
+
+  # let's go!
+  #
+  checkSwap $__swapconfig
+  if [ $? -ne 0 ]; then
+    echo "ABORTING. Unable to determine swap status."
     echo
-    exit 0
+    exit 1
+  fi
+
+  # translate to local vars
+  __swapconfig_reccnt="\${${__swapconfig}[SRECCNT]}"
+  __swapconfig_reccnt=$(eval "${PATH_EXPR} ${__swapconfig_reccnt}")
+
+  __swapconfig_size="\${${__swapconfig}[SIZE]}"
+  __swapconfig_size=$(eval "${PATH_EXPR} ${__swapconfig_size}")
+
+  __swapconfig_unit="\${${__swapconfig}[UNIT]}"
+  __swapconfig_unit=$(eval "${PATH_EXPR} ${__swapconfig_unit}")
+
+  # if [[ ${__swapconfig_reccnt} -eq 1 ]] && [[ ${__swapconfig_size} -gt 0 ]]; then
+  #   echo "Swap has already been enabled. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
+  #   if [[ "${FORCEEXEC}" -eq 0 ]]; then
+  #     # prompt user for confirmation
+  #     if [[ "no" == $(promptConfirm "Add additional swap?") ]]
+  #     then
+  #       echo "ABORTING. Nothing to do."
+  #       exit 0
+  #     fi
+  #   fi
+  # fi
+
+  # grab swap list
+  getSwapList $__swaplist
+
+  # translate to local vars
+  __swaplist_reccnt="\${${__swaplist}[SRECCNT]}"
+  __swaplist_reccnt=$(eval "${PATH_EXPR} ${__swaplist_reccnt}")
+
+  # iterate over our swaplist array and remove target (__swapid) or all if
+  # no target specified.
+  for((i=0; i<${__swaplist_reccnt}; i++)); do
+    __swaplist_item_swid="\${${__swaplist}[${i},SWID]}"
+    __swaplist_item_swid=$(eval "${PATH_EXPR} ${__swaplist_item_swid}")
+
+    __swaplist_item_file="\${${__swaplist}[${i},FILE]}"
+    __swaplist_item_file=$(eval "${PATH_EXPR} ${__swaplist_item_file}")
+
+    __swaplist_item_stype="\${${__swaplist}[${i},STYP]}"
+    __swaplist_item_stype=$(eval "${PATH_EXPR} ${__swaplist_item_stype}")
+
+    __swaplist_item_wdev="\${${__swaplist}[${i},WDEV]}"
+    __swaplist_item_wdev=$(eval "${PATH_EXPR} ${__swaplist_item_wdev}")
+
+    # if __swapid AND __swaplist_item_swid is match, then remove and break!
+
+    if [[ "${__swaplist_item_stype}" = "loop" ]]; then
+      # >swapoff /dev/loop0
+      # >losetup -d /dev/loop0
+      # remove file
+
+      # @TODO - remove loop swap
+
+    elif [[ "${__swaplist_item_stype}" = "fsys" ]]; then
+      # >swapoff /dev/loop0
+      # remove file
+
+      # @TODO - remove fsys swap
+    fi
+  done
+
+  # update swapconfig, if we removed wired swap, compare updated size with
+  # the old size.
+
+  # check if our work was a success
+  local __swapconfig_size_old=${__swapconfig_size}
+  checkSwap $__swapconfig
+  if [ $? -ne 0 ]; then
+    echo "ABORTING. Unable to determine swap status."
+    echo
+    exit 1
+  fi
+
+  # translate to local vars
+  __swapconfig_reccnt="\${${__swapconfig}[SRECCNT]}"
+  __swapconfig_reccnt=$(eval "${PATH_EXPR} ${__swapconfig_reccnt}")
+
+  __swapconfig_size="\${${__swapconfig}[SIZE]}"
+  __swapconfig_size=$(eval "${PATH_EXPR} ${__swapconfig_size}")
+
+  __swapconfig_unit="\${${__swapconfig}[UNIT]}"
+  __swapconfig_unit=$(eval "${PATH_EXPR} ${__swapconfig_unit}")
+
+  if [[ ${__swapconfig_reccnt} -eq 1 ]]; then
+    if [[ ${__swapconfig_size} -lt ${__swapconfig_size_old} ]]; then
+      echo "Swap has been updated. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
+      echo
+      exit 0
+    else
+      echo "Swap has NOT been updated. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
+      echo
+      exit 1
+    fi
   fi
 }
 
@@ -617,17 +767,6 @@ listswap() {
     printf "%-10s  %-20s  %-6s  %-6s\n" "${swaplist[$i,SWID]}" "${swaptype}" "${swaplist[$i,SIZE]}" "${swaplist[$i,USED]}"
   done
   echo
-}
-
-# removeswap()
-#
-# Remove swap from the system.
-#
-# @param { arrayref } [optional] Reference to an existing swapconfig array
-# @param { arrayref } [optional] Reference to an existing swaplist array
-#
-removeswap() {
-  echo "$FUNCNAME: not impl"
 }
 
 # parse a config file with KEY=VAL definitions, return array in variable
@@ -714,6 +853,21 @@ if [ -n "${cli_FORCEEXEC}" ]; then
   FORCEEXEC=${cli_FORCEEXEC};
 fi
 
+if [ -n "${cli_SWAPID}" ]; then
+  if [[ ${#cli_SWAPID} -eq 5 ]]; then
+    SWAPID=${cli_SWAPID}
+    if [ "${DEBUG}" -ne 0 ]; then
+      echo "DEBUG:   swapid: ${SWAPID}"
+    fi
+  else
+    echo
+    echo "ABORTING. Invalid swap id specified: \"${cli_SWAPID}\""
+    echo
+    usage
+    exit 1
+  fi
+fi
+
 if [ -n "${cli_SWAPSIZE}" ]; then
   if [[ ${cli_SWAPSIZE} =~ ^-?[0-9]+$ ]]; then
     SWAPSIZE=${cli_SWAPSIZE}
@@ -785,14 +939,14 @@ echo "Detected Linux variant: ${osconfig[NAME]} [${osconfig[VERSION]}]"
 
 if [[ ${ADDSWAP} -ne 0 ]] && [[ ${SWAPSIZE} -gt 0 ]]; then
   #
-  # -Additional (-a with -s option)
+  # -Add specific sized swap (-a with -s option)
   #
   addswap ${SWAPSIZE}
 
   exit 0
 else if [[ ${ADDSWAP} -ne 0 ]]; then
   #
-  # -Default
+  # -Add default sized swap
   #
   addswap
 
@@ -803,14 +957,21 @@ fi
 # Remove swap
 #
 
-# -All swap
-if [[ ${REMOVESWAP} -ne 0 ]]; then
+if [[ ${REMOVESWAP} -ne 0 ]] && [[ -n "${SWAPID}" ]]; then
+  #
+  # -Remove specific swap (-r with -i option)
+  #
+  removeswap ${SWAPID}
+
+  exit 0
+else if [[ ${REMOVESWAP} -ne 0 ]]; then
+  #
+  # -Remove all swap
+  #
   removeswap
 
   exit 0
 fi
-
-# -Specific swap (-r with -i option)
 
 #
 # List swap
