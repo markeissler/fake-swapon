@@ -26,17 +26,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# @TODO Implement options to free swap.
-#
-# NOTE: To remove loop device based swap you need to do the following:
-#
-# >swapoff /dev/loop0
-# >losetup -d /dev/loop0
-#
-# If you don't delete the loop device, the kernel will at some point remap the
-# vm back into the table.
-#
-
 PATH=/usr/local/bin
 
 PATH_BNAME="/usr/bin/basename"
@@ -159,8 +148,6 @@ EOF
 function usage_old {
 cat << EOF
 usage: ${PROGNAME} [options]
-usage: ${PROGNAME} -a [-s <swapsize>]
-usage: ${PROGNAME} -r [-i <swapid
 
 Add system virtual memory ("swap"). On file systems that don\'t support swap,
 the loop device will be used to create "fake" swap. The "add" and "remove"
@@ -750,6 +737,16 @@ removeSwap() {
     if [[ -n "${__swapid_target}" && "${__swapid_target}" = "${__swaplist_item_swid}" ]]; then
       __swapid_target_found=1
     fi
+
+    #
+    # To remove loop device based swap you need to do the following:
+    #
+    # >swapoff /dev/loop0
+    # >losetup -d /dev/loop0
+    #
+    # If you don't delete the loop device, the kernel will at some point remap
+    # the vm back into the table.
+    #
 
     if [ -z "${__swapid_target}" ] || [ ${__swapid_target_found} -eq 1 ]; then
 
