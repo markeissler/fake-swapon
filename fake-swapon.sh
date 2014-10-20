@@ -914,7 +914,7 @@ while [ $# -gt 0 ]; do
     -r | --remove-swap)     cli_REMOVESWAP=1; REMOVESWAP=${cli_REMOVESWAP};;
     -s | --swap-size)       cli_SWAPSIZE="$2"; shift;;
     -d | --debug)           cli_DEBUG=1; DEBUG=${cli_DEBUG};;
-    -f | --force)           cli_FORCEEXEC=1;;
+    -f | --force)           cli_FORCEEXEC=1; FORCEEXEC=${cli_FORCEEXEC};;
     -v | --version)         version; exit;;
     -h | --help)            usage; exit;;
     --)                     shift; break;;
@@ -926,17 +926,40 @@ done
 # Root user!!
 #
 if [[ $EUID -ne 0 ]]; then
+  echo
   echo "Superuser (root) privileges required." 1>&2
   echo
   exit 100
 fi
 
-# Rangle our vars
-#
-if [ -n "${cli_FORCEEXEC}" ]; then
-  FORCEEXEC=${cli_FORCEEXEC};
+# bail out if user hasn't specified any options
+if [ -z "${cli_ADDSWAP}" ] && [ -z "${cli_SWAPID}" ] \
+  && [ -z "${cli_LISTSWAP}" ] && [ -z "${cli_REMOVESWAP}" ] \
+  && [ -z "${cli_SWAPSIZE}" ]; then
+
+  exit 0
 fi
 
+# is the -s flag specified without the -a flag?
+if [ ! -z "${cli_SWAPSIZE}" ] && [ -z "${cli_ADDSWAP}" ]; then
+  echo
+  echo "ABORTING. You must specify the -a option with the -s option."
+  echo
+  usage;
+  exit;
+fi
+
+# is the -i flag specified without the -r flag?
+if [ ! -z "${cli_SWAPID}" ] && [ -z "${cli_REMOVESWAP}" ]; then
+  echo
+  echo "ABORTING. You must specify the -r option with the -i option."
+  echo
+  usage;
+  exit;
+fi
+
+# Rangle our vars
+#
 if [ -n "${cli_SWAPID}" ]; then
   if [[ ${#cli_SWAPID} -eq ${SWAPIDLEN} ]]; then
     SWAPID=${cli_SWAPID}
@@ -972,6 +995,8 @@ if [ -n "${cli_SWAPSIZE}" ]; then
   fi
 fi
 
+# check system compatibility
+#
 echo "Analyzing system for fake-swap status..."
 
 runos=""
@@ -1016,6 +1041,11 @@ if [[ "${osconfig[NAME]}" = "" ]] || [[ "${osconfig[VERSION]}" = "" ]]; then
 fi
 
 echo "Detected Linux variant: ${osconfig[NAME]} [${osconfig[VERSION]}]"
+
+
+##
+## All checks done. DO IT!
+##
 
 #
 # Add swap
