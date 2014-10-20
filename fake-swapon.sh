@@ -125,11 +125,31 @@ OPTIONS:
    -i, --swap-id                Swap id (as returned by "fake-swap --list-swap")
    -l, --list-swap              List swap managed by fake-swap
    -r, --remove-swap            Remove swap managed by fake-swap from vm pool
-   -s, --swap-size              Size of swap to add (use with --add-swap)
+   -s, --swap-size              Size (MB) of swap to add (use with --add-swap)
    -d, --debug                  Turn debugging on (increases verbosity)
    -f, --force                  Execute without user prompt
    -h, --help                   Show this message
    -v, --version                Output version of this script
+
+Adding swap:
+  ${PROGNAME} --addswap [--swap-size <swapsize>]
+
+Optionally specify swap size (in MB) with the --swap-size flag. Otherwise,
+the default value (${DEF_SWAPSIZE}) will be used. Do not append units to the
+specified value.
+
+Removing swap:
+  ${PROGNAME} --remove-swap [--swap-id <swapid>]
+
+Optionally specify swap id with the --swap-id option to specifically unwire and
+remove a single swap file. Otherwise, all managed swap files will be unwired and
+removed.
+
+NOTE: The --remove-swap option will continue without user prompting if only a
+single swap file is found or if multiple files are found and they are all
+unwired. If multiple files are found and enabled swap is greater than 0MB, the
+user will be prompted to continue unless the --force option has been enabled.
+
 
 EOF
 }
@@ -138,7 +158,9 @@ EOF
 #
 function usage_old {
 cat << EOF
-usage: ${PROGNAME} [options] targetName
+usage: ${PROGNAME} [options]
+usage: ${PROGNAME} -a [-s <swapsize>]
+usage: ${PROGNAME} -r [-i <swapid
 
 Add system virtual memory ("swap"). On file systems that don\'t support swap,
 the loop device will be used to create "fake" swap. The "add" and "remove"
@@ -149,11 +171,30 @@ OPTIONS:
    -i                           Swap id (as returned by "fake-swap -l")
    -l                           List swap managed by fake-swap
    -r                           Remove swap managed by fake-swap from vm pool
-   -s                           Size of swap to add (use with -a)
+   -s                           Size (MB) of swap to add (use with -a)
    -d                           Turn debugging on (increases verbosity)
    -f                           Execute without user prompt
    -h                           Show this message
    -v                           Output version of this script
+
+Adding swap:
+  ${PROGNAME} -a [-s <swapsize>]
+
+Optionally specify swap size (in MB) with the -s (swap size) flag. Otherwise,
+the default value (${DEF_SWAPSIZE}) will be used. Do not append units to the
+specified value.
+
+Removing swap:
+  ${PROGNAME} -r [-i <swapid>]
+
+Optionally specify swap id with the -i (swap-id) option to specifically unwire
+and remove a single swap file. Otherwise, all managed swap files will be unwired
+and removed.
+
+NOTE: The -r (remove-swap) option will continue without user prompting if only a
+single swap file is found or if multiple files are found and they are all
+unwired. If multiple files are found and enabled swap is greater than 0MB, the
+user will be prompted to continue unless the -f (force) option has been enabled.
 
 EOF
 }
