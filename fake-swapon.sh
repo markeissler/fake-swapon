@@ -40,12 +40,13 @@
 PATH=/usr/local/bin
 
 PATH_BNAME="/usr/bin/basename"
-PATHgetOPT="/usr/bin/getopt"
+PATH_GETOPT="/usr/bin/getopt"
 PATH_CAT="/usr/bin/cat"
 PATH_DD="/usr/bin/dd"
 PATH_LS="/bin/ls"
 PATH_CHMOD="/usr/bin/chmod"
 PATH_MKDIR="/usr/bin/mkdir"
+PATH_RM="/usr/bin/rm"
 PATH_STAT="/usr/bin/stat"
 PATH_SED="/usr/bin/sed"
 PATH_TR="/usr/bin/tr"
@@ -54,6 +55,7 @@ PATH_EXPR="/usr/bin/expr"
 
 PATH_MKSWAP="/usr/sbin/mkswap"
 PATH_SWAPON="/usr/sbin/swapon"
+PATH_SWAPOFF="/usr/sbin/swapoff"
 
 # Loop device support (required for CoreOS)
 #
@@ -71,9 +73,11 @@ PROGNAME=$(${PATH_BNAME} $0)
 # reset internal vars (do not touch these here)
 DEBUG=0
 FORCEEXEC=0
+GETOPT_OLD=0
 ADDSWAP=0
 LISTSWAP=0
 REMOVESWAP=0
+SWAPIDLEN=6
 SWAPSIZE=-1
 
 # defaults
@@ -354,7 +358,7 @@ getUniqStr() {
 
   dict="abcdefghijkmnopqrstuvxyz123456789"
 
-  for i in $(eval echo {0..$length}); do
+  for i in $(eval echo {1..$length}); do
     rand=$(( $RANDOM%${#dict} ))
     uniqstr="${uniqstr}${dict:$rand:1}"
   done
@@ -421,13 +425,13 @@ getUniqSWID() {
 addswap() {
   # swapsize vars
   local __swapsize=${DEF_SWAPSIZE}
-  if [ -n "${1}"] && [ ${1} -gt ${__swapsize} ]; then
+  if [ -n "${1}" ] && [ ${1} -gt ${__swapsize} ]; then
     __swapsize=${1}
   fi
 
   # swapconfig vars
   local __swapconfig="gSwapConfig"
-  if [ -n "${1}" ]; then
+  if [ -n "${2}" ]; then
     __swapconfig=${2}
   fi
   declare -g -A "$__swapconfig"
@@ -618,14 +622,15 @@ addswap() {
 #
 removeswap() {
   # swapsize vars
-  local __swapid=""
-  if [ -n "${1}"] && [ ${#1} -eq 5 ]; then
-    __swapid=${1}
+  local __swapid_target=""
+  if [ -n "${1}" ] && [ ${#1} -eq ${SWAPIDLEN} ]; then
+    __swapid_target=${1}
   fi
+  local __swapid_target_found=0
 
   # swapconfig vars
   local __swapconfig="gSwapConfig"
-  if [ -n "${1}" ]; then
+  if [ -n "${2}" ]; then
     __swapconfig=${2}
   fi
   declare -g -A "$__swapconfig"
@@ -665,18 +670,6 @@ removeswap() {
   __swapconfig_unit="\${${__swapconfig}[UNIT]}"
   __swapconfig_unit=$(eval "${PATH_EXPR} ${__swapconfig_unit}")
 
-  # if [[ ${__swapconfig_reccnt} -eq 1 ]] && [[ ${__swapconfig_size} -gt 0 ]]; then
-  #   echo "Swap has already been enabled. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
-  #   if [[ "${FORCEEXEC}" -eq 0 ]]; then
-  #     # prompt user for confirmation
-  #     if [[ "no" == $(promptConfirm "Add additional swap?") ]]
-  #     then
-  #       echo "ABORTING. Nothing to do."
-  #       exit 0
-  #     fi
-  #   fi
-  # fi
-
   # grab swap list
   getSwapList $__swaplist
 
@@ -684,8 +677,21 @@ removeswap() {
   __swaplist_reccnt="\${${__swaplist}[SRECCNT]}"
   __swaplist_reccnt=$(eval "${PATH_EXPR} ${__swaplist_reccnt}")
 
-  # iterate over our swaplist array and remove target (__swapid) or all if
-  # no target specified.
+  if [[ ${__swaplist_reccnt} -gt 1 ]] && [[ ${__swapconfig_size} -gt 0 ]]; then
+    echo "Multiple swap files have been found. Some may be wired."
+    echo "Swap has been enabled. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
+    if [[ "${FORCEEXEC}" -eq 0 ]]; then
+      # prompt user for confirmation
+      if [[ "no" == $(promptConfirm "Remove all managed swap?") ]]
+      then
+        echo "ABORTING. Nothing to do."
+        exit 0
+      fi
+    fi
+  fi
+
+  # iterate over our swaplist array and remove target (__swapid_target) or all
+  # managed swaps found if no target specified.
   for((i=0; i<${__swaplist_reccnt}; i++)); do
     __swaplist_item_swid="\${${__swaplist}[${i},SWID]}"
     __swaplist_item_swid=$(eval "${PATH_EXPR} ${__swaplist_item_swid}")
@@ -699,22 +705,47 @@ removeswap() {
     __swaplist_item_wdev="\${${__swaplist}[${i},WDEV]}"
     __swaplist_item_wdev=$(eval "${PATH_EXPR} ${__swaplist_item_wdev}")
 
-    # if __swapid AND __swaplist_item_swid is match, then remove and break!
+    # if __swapid_target AND __swaplist_item_swid is match, then remove and break!
+    if [[ -n "${__swapid_target}" && "${__swapid_target}" = "${__swaplist_item_swid}" ]]; then
+      __swapid_target_found=1
+    fi
 
-    if [[ "${__swaplist_item_stype}" = "loop" ]]; then
-      # >swapoff /dev/loop0
-      # >losetup -d /dev/loop0
-      # remove file
+    if [ -z "${__swapid_target}" ] || [ ${__swapid_target_found} -eq 1 ]; then
 
-      # @TODO - remove loop swap
-
-    elif [[ "${__swaplist_item_stype}" = "fsys" ]]; then
-      # >swapoff /dev/loop0
-      # remove file
-
-      # @TODO - remove fsys swap
+      if [[ "${__swaplist_item_stype}" = "loop" ]]; then
+        echo "Removing swap (loop): ${__swaplist_item_swid}"
+        # >swapoff /dev/loop0
+        # >losetup -d /dev/loop0
+        # remove file
+        echo "Found a swap file at ${__swaplist_item_file}"
+        echo "Disabling swap."
+        ${PATH_SWAPOFF} ${__swaplist_item_wdev}
+        echo "Disconnecting loop device."
+        ${PATH_LOSETUP} -d ${__swaplist_item_wdev}
+        echo "Removing swap file."
+        ${PATH_RM} ${__swaplist_item_file} &> /dev/null
+        echo "Swap has been unwired and removed."
+        echo
+      elif [[ "${__swaplist_item_stype}" = "fsys" ]]; then
+        echo "Removing swap (fsys): ${__swaplist_item_swid}"
+        # >swapoff /dev/wd.swap.abcde
+        # remove file
+        echo "Found a swap file at ${__swaplist_item_file}"
+        echo "Disabling swap."
+        ${PATH_SWAPOFF} ${__swaplist_item_wdev}
+        echo "Removing swap file."
+        ${PATH_RM} ${__swaplist_item_file} &> /dev/null
+        echo "Swap has been unwired and removed."
+        echo
+      fi
     fi
   done
+
+  if [ -n "${__swapid_target}" ] && [ ${__swapid_target_found} -eq 0 ]; then
+    echo
+    echo "WARNING. No swap found with id specified: ${__swapid_target}"
+    echo
+  fi
 
   # update swapconfig, if we removed wired swap, compare updated size with
   # the old size.
@@ -801,16 +832,16 @@ readconfig() {
 #   --version, v
 #
 params=""
-${PATHgetOPT} -T > /dev/null
+${PATH_GETOPT} -T > /dev/null
 if [ $? -eq 4 ]; then
   # GNU enhanced getopt is available
   PROGNAME=$(${PATH_BNAME} $0)
-  params="$(${PATHgetOPT} --name "$PROGNAME" --long add-swap,swap-id:,list-swap,remove-swap,swap-size:,force,help,version,debug --options ai:lrs:fhvd -- "$@")"
+  params="$(${PATH_GETOPT} --name "$PROGNAME" --long add-swap,swap-id:,list-swap,remove-swap,swap-size:,force,help,version,debug --options ai:lrs:fhvd -- "$@")"
 else
   # Original getopt is available
   GETOPT_OLD=1
   PROGNAME=$(${PATH_BNAME} $0)
-  params="$(${PATHgetOPT} ai:lrs:fhvd "$@")"
+  params="$(${PATH_GETOPT} ai:lrs:fhvd "$@")"
 fi
 
 # check for invalid params passed; bail out if error is set.
@@ -854,7 +885,7 @@ if [ -n "${cli_FORCEEXEC}" ]; then
 fi
 
 if [ -n "${cli_SWAPID}" ]; then
-  if [[ ${#cli_SWAPID} -eq 5 ]]; then
+  if [[ ${#cli_SWAPID} -eq ${SWAPIDLEN} ]]; then
     SWAPID=${cli_SWAPID}
     if [ "${DEBUG}" -ne 0 ]; then
       echo "DEBUG:   swapid: ${SWAPID}"
@@ -944,7 +975,7 @@ if [[ ${ADDSWAP} -ne 0 ]] && [[ ${SWAPSIZE} -gt 0 ]]; then
   addswap ${SWAPSIZE}
 
   exit 0
-else if [[ ${ADDSWAP} -ne 0 ]]; then
+elif [[ ${ADDSWAP} -ne 0 ]]; then
   #
   # -Add default sized swap
   #
@@ -964,7 +995,7 @@ if [[ ${REMOVESWAP} -ne 0 ]] && [[ -n "${SWAPID}" ]]; then
   removeswap ${SWAPID}
 
   exit 0
-else if [[ ${REMOVESWAP} -ne 0 ]]; then
+elif [[ ${REMOVESWAP} -ne 0 ]]; then
   #
   # -Remove all swap
   #
