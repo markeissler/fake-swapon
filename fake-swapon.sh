@@ -69,8 +69,23 @@ REMOVESWAP=0
 SWAPIDLEN=6
 SWAPSIZE=-1
 
+# min bash required
+VERS_BASH_MAJOR=4
+VERS_BASH_MINOR=2
+VERS_BASH_PATCH=0
+
 # defaults
 DEF_SWAPSIZE=1024
+
+# check for minimum bash
+if [[ ${BASH_VERSINFO[0]} < ${VERS_BASH_MAJOR} ||
+  ${BASH_VERSINFO[1]} < ${VERS_BASH_MINOR} ||
+  ${BASH_VERSINFO[2]} < ${VERS_BASH_PATCH} ]]; then
+  echo -n "${PROGNAME} requires at least BASH ${VERS_BASH_MAJOR}.${VERS_BASH_MINOR}.${VERS_BASH_PATCH}!"
+  echo " (I seem to be running in BASH ${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}.${BASH_VERSINFO[2]})"
+  echo
+  exit 100
+fi
 
 #
 # FUNCTIONS
