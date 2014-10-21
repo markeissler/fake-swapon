@@ -986,24 +986,96 @@ fi
 
 eval set -- "$params"
 unset params
+params_count=$#
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    -a | --add-swap)        cli_ADDSWAP=1; ADDSWAP=${cli_ADDSWAP};;
-    -i | --swap-id)         cli_SWAPID="$2"; shift;;
-    -l | --list-swap)       cli_LISTSWAP=1; LISTSWAP=${cli_LISTSWAP};;
-    -r | --remove-swap)     cli_REMOVESWAP=1; REMOVESWAP=${cli_REMOVESWAP};;
-    -s | --swap-size)       cli_SWAPSIZE="$2"; shift;;
-    -d | --debug)           cli_DEBUG=1; DEBUG=${cli_DEBUG};;
-    -f | --force)           cli_FORCEEXEC=1; FORCEEXEC=${cli_FORCEEXEC};;
-    -v | --version)         version; exit;;
-    -h | --help)            usage; exit;;
-    --)                     shift; break;;
+    -a | --add-swap)
+      if [[ ${REMOVESWAP} -ne 0 ]]; then
+        if [ "${DEBUG}" -ne 0 ]; then
+          echo "-a option specified simultaneously with -r option";
+        fi
+        usage;
+        exit 1;
+      fi
+      cli_ADDSWAP=1; ADDSWAP=${cli_ADDSWAP};
+      ;;
+    -i | --swap-id)
+      if [[ ${REMOVESWAP} -ne 1 || ${ADDSWAP} -eq 1 ]]; then
+        if [ "${DEBUG}" -ne 0 ]; then
+          echo "-i option without -r option";
+        fi
+        usage;
+        exit 1;
+      fi
+      cli_SWAPID="$2";
+      shift;
+      ;;
+    -l | --list-swap)
+      echo "C: ${params_count}";
+      echo "D: ${DEBUG}"
+      if [[ ( ${params_count} -eq 3 && ${DEBUG} -eq 0 ) || ( ${params_count} -gt 3 ) ]]; then
+        if [ "${DEBUG}" -ne 0 ]; then
+          echo "-l option with additional options";
+        fi
+        usage;
+        exit 1;
+      fi
+      cli_LISTSWAP=1; LISTSWAP=${cli_LISTSWAP};
+      ;;
+    -r | --remove-swap)
+      if [[ ${ADDSWAP} -ne 0 ]]; then
+        if [ "${DEBUG}" -ne 0 ]; then
+          echo "-r option specified simultaneously with -a option";
+        fi
+        usage;
+        exit 1;
+      fi
+      cli_REMOVESWAP=1; REMOVESWAP=${cli_REMOVESWAP};
+      ;;
+    -s | --swap-size)
+      if [[ ${ADDSWAP} -ne 1 || ${REMOVESWAP} -eq 1 ]]; then
+        if [ "${DEBUG}" -ne 0 ]; then
+          echo "-s option without -a option";
+        fi
+        usage;
+        exit 1;
+      fi
+      cli_SWAPSIZE="$2";
+      shift;
+      ;;
+    -d | --debug)
+      cli_DEBUG=1; DEBUG=${cli_DEBUG};
+      ;;
+    -f | --force)
+      cli_FORCEEXEC=1; FORCEEXEC=${cli_FORCEEXEC};
+      ;;
+    -v | --version)
+      version;
+      exit;
+      ;;
+    -h | --help)
+      usage;
+      exit;
+      ;;
+    --)
+      shift;
+      break;
+      ;;
   esac
   shift
 done
 
-
+# Grab final argument and abort (our arguments must be accompanied by flags!)
+shift $((OPTIND-1))
+if [ -n "${1}" ]; then
+  echo
+  echo "ABORTING. Found an orphaned argument. Did you forget an option flag?"
+  echo
+  usage
+  exit 1
+fi
+exit 1
 # Root user!!
 #
 if [[ $EUID -ne 0 ]]; then
