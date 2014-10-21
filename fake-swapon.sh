@@ -762,15 +762,17 @@ removeSwap() {
   __swaplist_reccnt="\${${__swaplist}[SRECCNT]}"
   __swaplist_reccnt=$(eval "${PATH_EXPR} \"${__swaplist_reccnt}\"")
 
-  if [[ ${__swaplist_reccnt} -gt 1 ]] && [[ ${__swapconfig_size} -gt 0 ]]; then
-    echo "Multiple swap files have been found. Some may be wired."
-    echo "Swap has been enabled. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
-    if [[ "${FORCEEXEC}" -eq 0 ]]; then
-      # prompt user for confirmation
-      if [[ "no" == $(promptConfirm "Remove all managed swap?") ]]
-      then
-        echo "ABORTING. Nothing to do."
-        exit 0
+  if [ -z "${__swapid_target}" ]; then
+    if [[ ${__swaplist_reccnt} -gt 1 ]] && [[ ${__swapconfig_size} -gt 0 ]]; then
+      echo "Multiple swap files have been found. Some may be wired."
+      echo "Swap has been enabled. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
+      if [[ "${FORCEEXEC}" -eq 0 ]]; then
+        # prompt user for confirmation
+        if [[ "no" == $(promptConfirm "Remove all managed swap?") ]]
+        then
+          echo "ABORTING. Nothing to do."
+          exit 0
+        fi
       fi
     fi
   fi
