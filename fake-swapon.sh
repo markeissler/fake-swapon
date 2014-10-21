@@ -41,6 +41,7 @@ PATH_SED="/usr/bin/sed"
 PATH_TR="/usr/bin/tr"
 PATH_UNAME="/usr/bin/uname"
 PATH_EXPR="/usr/bin/expr"
+PATH_AWK="/usr/bin/awk"
 
 PATH_MKSWAP="/usr/sbin/mkswap"
 PATH_SWAPON="/usr/sbin/swapon"
@@ -287,7 +288,7 @@ getSwapList() {
   local lcount scount
   local resp rslt
   local styparray
-  local __wdev __type
+  local __wdev __type __size_i __size_i
 
   # init array
   eval "$__swaplist[SRECCNT]=${count}"
@@ -306,7 +307,7 @@ getSwapList() {
   fi
 
   # get swap device and file information
-  while IFS=" " read -r swapfile; do
+  while IFS=" " read -r filesize swapfile; do
     resp=$(echo ${swapfile} | ${PATH_SED} -Ee "/(lp.swap|wd.swap)/!d" -e "s:^/root/swap[/]?/(wd.swap|lp.swap).(.*)$:\2@\1:")
     if [ "${DEBUG}" -ne 0 ]; then
       echo "DEBUG: swapfile: $swapfile"
@@ -393,9 +394,34 @@ getSwapList() {
 
       if [[ -n "${__type}" ]]; then
         eval "$__swaplist[${_idx},WIRE]=1"
+      else
+        # calculate size of unwired swap from file size
+        #
+        # NOTE: We have to use awk and printf here since bash doesn't support
+        # floating point numbers. We convert to int for bash comparisons.
+        #
+        __size_f=$(${PATH_AWK} "BEGIN {printf \"%.1f\", ${filesize}/1024}")
+        __size_i=${__size_f%%.[0-9]*}
+        if [[ ${__size_i} -lt 1025 ]]; then
+          # print without floating point unless it is greater than 0
+          if [[ ${__size_f##[0-9]*.} -gt 0 ]]; then
+            eval "$__swaplist[${_idx},SIZE]=${__size_f}M"
+          else
+            eval "$__swaplist[${_idx},SIZE]=${__size_i}M"
+          fi
+        else
+          __size_f=$(${PATH_AWK} "BEGIN {printf \"%.1f\", ${__size_f}/1024}")
+          __size_i=${__size_f%%.[0-9]*}
+          # print without floating point unless it is greater than 0
+          if [[ ${__size_f##[0-9]*.} -gt 0 ]]; then
+            eval "$__swaplist[${_idx},SIZE]=${__size_f}G"
+          else
+            eval "$__swaplist[${_idx},SIZE]=${__size_i}G"
+          fi
+        fi
       fi
     fi
-  done <<< "$(${PATH_LS} -d1 ${PATH_SWAPDIR}/*)"
+  done <<< "$(${PATH_LS} -s -d1 ${PATH_SWAPDIR}/*)"
 }
 
 # getUniqStr()
@@ -450,7 +476,7 @@ getUniqSWID() {
   fi
 
   if [ -z "${checkswid}" ]; then
-    checkswid=$(getUniqStr 5)
+    checkswid=$(getUniqStr ${SWAPIDLEN})
   fi
 
   __sreccnt="\${${__swaplist}[SRECCNT]}"
@@ -895,7 +921,7 @@ listswap() {
     if [[ -z "${swapused}" ]]; then
       swapused="??"
     fi
-    printf "%s %-10s  %-20s  %-6s  %-6s\n" "${swapwire}" "${swaplist[$i,SWID]}" "${swaptype}" "${swapsize}" "${swapused}"
+    printf "%-1s %-10s  %-20s  %-6s  %-6s\n" "${swapwire}" "${swaplist[$i,SWID]}" "${swaptype}" "${swapsize}" "${swapused}"
   done
 
   if [[ ${swaplist[SRECCNT]} -gt 0 ]]; then
