@@ -1091,11 +1091,21 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # bail out if user hasn't specified any options
-if [ -z "${cli_ADDSWAP}" ] && [ -z "${cli_SWAPID}" ] \
-  && [ -z "${cli_LISTSWAP}" ] && [ -z "${cli_REMOVESWAP}" ] \
-  && [ -z "${cli_SWAPSIZE}" ]; then
+if [[ ${params_count} -eq 1 ]]; then
+  echo
+  echo "ABORTING. You have not specified any actionable options."
+  echo
+  usage;
+  exit;
+fi
 
-  exit 0
+# bail out if user has specified debug without any other options
+if [[ ${DEBUG} -eq 1 && ${params_count} -eq 2 ]]; then
+  echo
+  echo "ABORTING. You cannot specify the -d option on its own."
+  echo
+  usage;
+  exit;
 fi
 
 # is the -s flag specified without the -a flag?
