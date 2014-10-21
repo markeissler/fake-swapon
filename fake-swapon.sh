@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # STEmacsModelines:
 # -*- Shell-Unix-Generic -*-
