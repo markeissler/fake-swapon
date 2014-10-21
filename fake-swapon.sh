@@ -660,7 +660,7 @@ addSwap() {
   fi
 
   echo
-  echo "REMEMBER 1: You will need to manually delete the swap file when done: ${swapfile}"
+  echo "REMEMBER 1: You will need to remove the swap file when done: ${swapfile}"
   echo "REMEMBER 2: You will need to re-run this script between reboots/shutdowns."
   echo
 
