@@ -1079,7 +1079,8 @@ if [ -n "${1}" ]; then
   usage
   exit 1
 fi
-exit 1
+
+
 # Root user!!
 #
 if [[ $EUID -ne 0 ]]; then
