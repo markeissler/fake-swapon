@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # STEmacsModelines:
 # -*- Shell-Unix-Generic -*-
@@ -1016,8 +1016,6 @@ while [ $# -gt 0 ]; do
       shift;
       ;;
     -l | --list-swap)
-      echo "C: ${params_count}";
-      echo "D: ${DEBUG}"
       if [[ ( ${params_count} -eq 3 && ${DEBUG} -eq 0 ) || ( ${params_count} -gt 3 ) ]]; then
         if [ "${DEBUG}" -ne 0 ]; then
           echo "-l option with additional options";
