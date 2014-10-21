@@ -120,7 +120,9 @@ function usage {
 
 function usage_new {
 ${PATH_CAT} << EOF
-usage: ${PROGNAME} [options]
+usage: ${PROGNAME} [--debug] -l
+       ${PROGNAME} [--debug] [--force] --addswap [--swap-size <swapsize>]
+       ${PROGNAME} [--debug] [--force] --remove-swap [--swap-id <swapid>]
 
 Add system virtual memory ("swap"). On file systems that don\'t support swap,
 the loop device will be used to create "fake" swap. The "add" and "remove"
@@ -138,14 +140,14 @@ OPTIONS:
    -v, --version                Output version of this script
 
 Adding swap:
-  ${PROGNAME} --addswap [--swap-size <swapsize>]
+  ${PROGNAME} [--debug] [--force] --addswap [--swap-size <swapsize>]
 
 Optionally specify swap size (in MB) with the --swap-size flag. Otherwise,
 the default value (${DEF_SWAPSIZE}) will be used. Do not append units to the
 specified value.
 
 Removing swap:
-  ${PROGNAME} --remove-swap [--swap-id <swapid>]
+  ${PROGNAME} [--debug] [--force] --remove-swap [--swap-id <swapid>]
 
 Optionally specify swap id with the --swap-id option to specifically unwire and
 remove a single swap file. Otherwise, all managed swap files will be unwired and
@@ -164,7 +166,9 @@ EOF
 #
 function usage_old {
 cat << EOF
-usage: ${PROGNAME} [options]
+usage: ${PROGNAME} [-d] -l
+       ${PROGNAME} [-d] [-f] -a [-s <swapsize>]
+       ${PROGNAME} [-d] [-f] -r [-i <swapid>]
 
 Add system virtual memory ("swap"). On file systems that don\'t support swap,
 the loop device will be used to create "fake" swap. The "add" and "remove"
@@ -182,14 +186,14 @@ OPTIONS:
    -v                           Output version of this script
 
 Adding swap:
-  ${PROGNAME} -a [-s <swapsize>]
+  ${PROGNAME} [-d] [-f] -a [-s <swapsize>]
 
 Optionally specify swap size (in MB) with the -s (swap size) flag. Otherwise,
 the default value (${DEF_SWAPSIZE}) will be used. Do not append units to the
 specified value.
 
 Removing swap:
-  ${PROGNAME} -r [-i <swapid>]
+  ${PROGNAME} [-d] [-f] -r [-i <swapid>]
 
 Optionally specify swap id with the -i (swap-id) option to specifically unwire
 and remove a single swap file. Otherwise, all managed swap files will be unwired
