@@ -68,6 +68,7 @@ LISTSWAP=0
 REMOVESWAP=0
 SWAPIDLEN=6
 SWAPSIZE=-1
+EMPTYSTR=""
 
 # min bash required
 VERS_BASH_MAJOR=4
@@ -286,11 +287,11 @@ getSwapList() {
   local lcount scount
   local resp rslt
   local styparray
-  local __wdev
+  local __wdev __type
 
   # init array
   eval "$__swaplist[SRECCNT]=${count}"
-  eval "$__swaplist[SRECSIZ]=7"
+  eval "$__swaplist[SRECSIZ]=8"
   eval "$__swaplist[SRECOFF]=3"
 
   # suppress empty swapdir listing errors, check to see iif we have any swap at
@@ -342,6 +343,11 @@ getSwapList() {
       eval "$__swaplist[${_idx},SWID]=${styparray[0]}"
       eval "$__swaplist[${_idx},STYP]=${styparray[1]}"
       eval "$__swaplist[${_idx},FILE]=${swapfile}"
+      eval "$__swaplist[${_idx},WIRE]=0"
+      eval "$__swaplist[${_idx},WDEV]=${EMPTYSTR}"
+      eval "$__swaplist[${_idx},SIZE]=${EMPTYSTR}"
+      eval "$__swaplist[${_idx},USED]=${EMPTYSTR}"
+      eval "$__swaplist[${_idx},TYPE]=${EMPTYSTR}"
 
       # retrieve loop device information
       if [[ "${styparray[1]}" = "loop" ]]; then
@@ -370,7 +376,7 @@ getSwapList() {
         # swdevice will point to /dev/loopX; on fsys devices, the swdevice
         # will point to the backing file.
         __wdev="\${${__swaplist}[${_idx},WDEV]}"
-        __wdev=$(eval "${PATH_EXPR} ${__wdev}")
+        __wdev=$(eval "${PATH_EXPR} \"${__wdev}\"")
 
         if [[ "${__wdev}" = "${swdevice}" ]]; then
           eval "$__swaplist[${_idx},SIZE]=${size}"
@@ -379,6 +385,15 @@ getSwapList() {
         fi
         (( scount++ ))
       done <<< "$(${PATH_SWAPON} --show)"
+
+      # need to translate type value for local use, assume swap is wired if
+      # type is not empty.
+      __type="\${${__swaplist}[${_idx},TYPE]}"
+      __type=$(eval "${PATH_EXPR} \"${__type}\"")
+
+      if [[ -n "${__type}" ]]; then
+        eval "$__swaplist[${_idx},WIRE]=1"
+      fi
     fi
   done <<< "$(${PATH_LS} -d1 ${PATH_SWAPDIR}/*)"
 }
@@ -439,13 +454,13 @@ getUniqSWID() {
   fi
 
   __sreccnt="\${${__swaplist}[SRECCNT]}"
-  __sreccnt=$(eval "${PATH_EXPR} ${__sreccnt}")
+  __sreccnt=$(eval "${PATH_EXPR} \"${__sreccnt}\"")
 
   while [[ $collision -eq 1 ]]; do
     for((i=0; i<${__sreccnt}; i++)); do
 
       __swid="\${${__swaplist}[$i,SWID]}"
-      __swid=$(eval "${PATH_EXPR} ${__swid}")
+      __swid=$(eval "${PATH_EXPR} \"${__swid}\"")
 
       if [[ "${__swid}" = "${checkswid}" ]]; then
         checkswid=$(getUniqSWID $__swaplist $checkswid)
@@ -506,13 +521,13 @@ addSwap() {
 
   # translate to local vars
   __swapconfig_reccnt="\${${__swapconfig}[SRECCNT]}"
-  __swapconfig_reccnt=$(eval "${PATH_EXPR} ${__swapconfig_reccnt}")
+  __swapconfig_reccnt=$(eval "${PATH_EXPR} \"${__swapconfig_reccnt}\"")
 
   __swapconfig_size="\${${__swapconfig}[SIZE]}"
-  __swapconfig_size=$(eval "${PATH_EXPR} ${__swapconfig_size}")
+  __swapconfig_size=$(eval "${PATH_EXPR} \"${__swapconfig_size}\"")
 
   __swapconfig_unit="\${${__swapconfig}[UNIT]}"
-  __swapconfig_unit=$(eval "${PATH_EXPR} ${__swapconfig_unit}")
+  __swapconfig_unit=$(eval "${PATH_EXPR} \"${__swapconfig_unit}\"")
 
   if [[ ${__swapconfig_reccnt} -eq 1 ]] && [[ ${__swapconfig_size} -gt 0 ]]; then
     echo "Swap has already been enabled. Detected: ${__swapconfig_size} ${__swapconfig_unit}"
@@ -548,7 +563,7 @@ addSwap() {
 
   # translate to local vars
   __sreccnt="\${${__swaplist}[SRECCNT]}"
-  __sreccnt=$(eval "${PATH_EXPR} ${__sreccnt}")
+  __sreccnt=$(eval "${PATH_EXPR} \"${__sreccnt}\"")
 
   if [ "${DEBUG}" -ne 0 ]; then
     echo "DEBUG:  sreccnt: ${__sreccnt}"
@@ -634,13 +649,13 @@ addSwap() {
 
   # translate to local vars
   __swapconfig_reccnt="\${${__swapconfig}[SRECCNT]}"
-  __swapconfig_reccnt=$(eval "${PATH_EXPR} ${__swapconfig_reccnt}")
+  __swapconfig_reccnt=$(eval "${PATH_EXPR} \"${__swapconfig_reccnt}\"")
 
   __swapconfig_size="\${${__swapconfig}[SIZE]}"
-  __swapconfig_size=$(eval "${PATH_EXPR} ${__swapconfig_size}")
+  __swapconfig_size=$(eval "${PATH_EXPR} \"${__swapconfig_size}\"")
 
   __swapconfig_unit="\${${__swapconfig}[UNIT]}"
-  __swapconfig_unit=$(eval "${PATH_EXPR} ${__swapconfig_unit}")
+  __swapconfig_unit=$(eval "${PATH_EXPR} \"${__swapconfig_unit}\"")
 
   if [[ ${__swapconfig_reccnt} -eq 1 ]]; then
     if [[ ${__swapconfig_size} -gt ${__swapconfig_size_old} ]]; then
@@ -693,6 +708,7 @@ removeSwap() {
   local __swaplist_item_file
   local __swaplist_item_stype
   local __swaplist_item_wdev
+  local __swaplist_item_wire
 
   # let's go!
   #
@@ -705,20 +721,20 @@ removeSwap() {
 
   # translate to local vars
   __swapconfig_reccnt="\${${__swapconfig}[SRECCNT]}"
-  __swapconfig_reccnt=$(eval "${PATH_EXPR} ${__swapconfig_reccnt}")
+  __swapconfig_reccnt=$(eval "${PATH_EXPR} \"${__swapconfig_reccnt}\"")
 
   __swapconfig_size="\${${__swapconfig}[SIZE]}"
-  __swapconfig_size=$(eval "${PATH_EXPR} ${__swapconfig_size}")
+  __swapconfig_size=$(eval "${PATH_EXPR} \"${__swapconfig_size}\"")
 
   __swapconfig_unit="\${${__swapconfig}[UNIT]}"
-  __swapconfig_unit=$(eval "${PATH_EXPR} ${__swapconfig_unit}")
+  __swapconfig_unit=$(eval "${PATH_EXPR} \"${__swapconfig_unit}\"")
 
   # grab swap list
   getSwapList $__swaplist
 
   # translate to local vars
   __swaplist_reccnt="\${${__swaplist}[SRECCNT]}"
-  __swaplist_reccnt=$(eval "${PATH_EXPR} ${__swaplist_reccnt}")
+  __swaplist_reccnt=$(eval "${PATH_EXPR} \"${__swaplist_reccnt}\"")
 
   if [[ ${__swaplist_reccnt} -gt 1 ]] && [[ ${__swapconfig_size} -gt 0 ]]; then
     echo "Multiple swap files have been found. Some may be wired."
@@ -737,16 +753,19 @@ removeSwap() {
   # managed swaps found if no target specified.
   for((i=0; i<${__swaplist_reccnt}; i++)); do
     __swaplist_item_swid="\${${__swaplist}[${i},SWID]}"
-    __swaplist_item_swid=$(eval "${PATH_EXPR} ${__swaplist_item_swid}")
+    __swaplist_item_swid=$(eval "${PATH_EXPR} \"${__swaplist_item_swid}\"")
 
     __swaplist_item_file="\${${__swaplist}[${i},FILE]}"
-    __swaplist_item_file=$(eval "${PATH_EXPR} ${__swaplist_item_file}")
+    __swaplist_item_file=$(eval "${PATH_EXPR} \"${__swaplist_item_file}\"")
 
     __swaplist_item_stype="\${${__swaplist}[${i},STYP]}"
-    __swaplist_item_stype=$(eval "${PATH_EXPR} ${__swaplist_item_stype}")
+    __swaplist_item_stype=$(eval "${PATH_EXPR} \"${__swaplist_item_stype}\"")
 
     __swaplist_item_wdev="\${${__swaplist}[${i},WDEV]}"
-    __swaplist_item_wdev=$(eval "${PATH_EXPR} ${__swaplist_item_wdev}")
+    __swaplist_item_wdev=$(eval "${PATH_EXPR} \"${__swaplist_item_wdev}\"")
+
+    __swaplist_item_wire="\${${__swaplist}[${i},WIRE]}"
+    __swaplist_item_wire=$(eval "${PATH_EXPR} \"${__swaplist_item_wire}\"")
 
     # if __swapid_target AND __swaplist_item_swid is match, then remove and break!
     if [[ -n "${__swapid_target}" && "${__swapid_target}" = "${__swaplist_item_swid}" ]]; then
@@ -771,10 +790,16 @@ removeSwap() {
         # >losetup -d /dev/loop0
         # remove file
         echo "Found a swap file at ${__swaplist_item_file}"
-        echo "Disabling swap."
-        ${PATH_SWAPOFF} ${__swaplist_item_wdev}
-        echo "Disconnecting loop device."
-        ${PATH_LOSETUP} -d ${__swaplist_item_wdev}
+
+        if [[ "${__swaplist_item_wire}" -eq 1 ]]; then
+          echo "Disabling swap."
+          ${PATH_SWAPOFF} ${__swaplist_item_wdev}
+          echo "Disconnecting loop device."
+          ${PATH_LOSETUP} -d ${__swaplist_item_wdev}
+        else
+          echo "Swap is unwired."
+        fi
+
         echo "Removing swap file."
         ${PATH_RM} ${__swaplist_item_file} &> /dev/null
         echo "Swap has been unwired and removed."
@@ -784,8 +809,14 @@ removeSwap() {
         # >swapoff /dev/wd.swap.abcde
         # remove file
         echo "Found a swap file at ${__swaplist_item_file}"
-        echo "Disabling swap."
-        ${PATH_SWAPOFF} ${__swaplist_item_wdev}
+
+        if [[ "${__swaplist_item_wire}" -eq 1 ]]; then
+          echo "Disabling swap."
+          ${PATH_SWAPOFF} ${__swaplist_item_wdev}
+        else
+          echo "Swap is unwired."
+        fi
+
         echo "Removing swap file."
         ${PATH_RM} ${__swaplist_item_file} &> /dev/null
         echo "Swap has been unwired and removed."
@@ -814,13 +845,13 @@ removeSwap() {
 
   # translate to local vars
   __swapconfig_reccnt="\${${__swapconfig}[SRECCNT]}"
-  __swapconfig_reccnt=$(eval "${PATH_EXPR} ${__swapconfig_reccnt}")
+  __swapconfig_reccnt=$(eval "${PATH_EXPR} \"${__swapconfig_reccnt}\"")
 
   __swapconfig_size="\${${__swapconfig}[SIZE]}"
-  __swapconfig_size=$(eval "${PATH_EXPR} ${__swapconfig_size}")
+  __swapconfig_size=$(eval "${PATH_EXPR} \"${__swapconfig_size}\"")
 
   __swapconfig_unit="\${${__swapconfig}[UNIT]}"
-  __swapconfig_unit=$(eval "${PATH_EXPR} ${__swapconfig_unit}")
+  __swapconfig_unit=$(eval "${PATH_EXPR} \"${__swapconfig_unit}\"")
 
   if [[ ${__swapconfig_reccnt} -eq 1 ]]; then
     if [[ ${__swapconfig_size} -lt ${__swapconfig_size_old} ]]; then
@@ -841,15 +872,37 @@ listswap() {
   swaplist="swaplist"
   getSwapList $swaplist
 
-  printf "Swap Id     Type                  Size    Used\n"
+  printf "\n? Swap Id     Type                  Size    Used\n"
 
   for((i=0; i<${swaplist[SRECCNT]}; i++)); do
     swaptype="${swaplist[$i,TYPE]}"
     if [[ "${swaplist[$i,STYP]}" = "loop" ]]; then
       swaptype="${swaptype} (loop)"
+    elif [[ "${swaplist[$i,STYP]}" = "fsys" ]]; then
+      swaptype="${swaptype} (fsys)"
     fi
-    printf "%-10s  %-20s  %-6s  %-6s\n" "${swaplist[$i,SWID]}" "${swaptype}" "${swaplist[$i,SIZE]}" "${swaplist[$i,USED]}"
+    swapwire=""
+    if [[ ${swaplist[$i,WIRE]} -eq 0 ]]; then
+      swapwire="*"
+      # trim leading space
+      swaptype=${swaptype##[[:space:]]}
+    fi
+    swapsize="${swaplist[$i,SIZE]}"
+    if [[ -z "${swapsize}" ]]; then
+      swapsize="??"
+    fi
+    swapused="${swaplist[$i,USED]}"
+    if [[ -z "${swapused}" ]]; then
+      swapused="??"
+    fi
+    printf "%s %-10s  %-20s  %-6s  %-6s\n" "${swapwire}" "${swaplist[$i,SWID]}" "${swaptype}" "${swapsize}" "${swapused}"
   done
+
+  if [[ ${swaplist[SRECCNT]} -gt 0 ]]; then
+    echo; echo "--"
+    echo "* preceding Swap Id denotes unwired swap"
+  fi
+
   echo
 }
 
