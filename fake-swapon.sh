@@ -57,7 +57,7 @@ PATH_SWAPDIR="/root/swap"
 
 
 ###### NO SERVICABLE PARTS BELOW ######
-VERSION=2.0.0
+VERSION=2.0.1
 PROGNAME=$(${PATH_BNAME} $0)
 
 # reset internal vars (do not touch these here)
