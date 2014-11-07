@@ -57,7 +57,7 @@ PATH_SWAPDIR="/root/swap"
 
 
 ###### NO SERVICABLE PARTS BELOW ######
-VERSION=2.0.0
+VERSION=2.0.1
 PROGNAME=$(${PATH_BNAME} $0)
 
 # reset internal vars (do not touch these here)
@@ -1165,28 +1165,27 @@ fi
 #
 echo "Analyzing system for fake-swap status..."
 
-runos=""
+runos="unknown"
 
 unamestr=$(${PATH_UNAME})
 case "${unamestr}" in
 "Linux" )
-  runos='linux'
+  runos="linux"
   ;;
 "FreeBSD" )
-  runos='freebsd'
+  runos="freebsd"
   ;;
 "Darwin" )
-  runos='osx'
+  runos="osx"
   ;;
 "SunOS" )
-  runos='solaris'
+  runos="solaris"
   ;;
 * )
-  runos=${platform}
   ;;
 esac
 
-if [ "${runos}" != 'linux' ]; then
+if [ "${runos}" != "linux" ]; then
   echo "ABORTING. Target OS doesn't appear to be Linux."
   echo
   exit 1

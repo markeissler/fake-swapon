@@ -20,7 +20,7 @@ To install fake-swapon, just copy the script to a suitable directory (like /usr/
 
 After the execute bit has been set on the fake-swapon.sh script, you will be able to call the script without having to invoke a shell first and then pass the script as an argument.
 
-**NOTE: fake-swapon requires BASH 4.0 or greater.**
+**NOTE: fake-swapon requires BASH 4.2 or greater.**
 
 ## Usage
 Keep in mind that fake-swapon targets its owned managed swap only, it will not manage or return results for swap added through other means.
@@ -104,7 +104,7 @@ fake-swapon can target Linux variants only. Supported Linux distributions curren
 * [CoreOS](https://coreos.com/)
 * [CentOS](http://www.centos.org/)
 
-fake-swapon requires BASH 4.0 or higher.
+fake-swapon requires BASH 4.2 or higher.
 
 ## License
 fake-swapon is licensed under the MIT open source license.
