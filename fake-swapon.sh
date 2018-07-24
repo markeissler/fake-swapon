@@ -6,6 +6,8 @@
 # Create and enable a swap file on Linux.
 #
 
+# The MIT License (MIT)
+
 # Copyright (c) 2014-2018 Mark Eissler, mark@mixtur.com
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
