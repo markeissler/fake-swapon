@@ -76,6 +76,9 @@ VERS_BASH_PATCH=0
 DEF_SWAPSIZE=1024
 DEF_SWAPDIR="/root/swap"
 
+# invalid swap directories, '/' will be added as well
+BAD_SWAPDIR=( /proc /tmp )
+
 # check for minimum bash
 if [[ ${BASH_VERSINFO[0]} < ${VERS_BASH_MAJOR} ||
   ${BASH_VERSINFO[1]} < ${VERS_BASH_MINOR} ||
@@ -105,6 +108,12 @@ basename() {
   else
     echo ""; return 1
   fi
+}
+
+function join_by {
+  local __delim="${1}"; shift
+  local __string="${1}"; shift
+  printf "%s" "$__string${@/#/$__delim}"
 }
 
 function usage {
@@ -1174,6 +1183,24 @@ if [ -n "${cli_SWAPDIR}" ]; then
   if [ "${DEBUG}" -ne 0 ]; then
     echo "DEBUG:  swapdir: ${SWAPDIR}"
   fi
+  # swap cannot be added at the root directory level
+  if [[ "${SWAPDIR}" == '/' ]]; then
+      echo
+      echo "ABORTING. Swap directory path cannot be placed at root level!"
+      echo
+      usage
+      exit 1
+  fi
+  # swap cannot be added to a list of additional directories
+  for d in "${BAD_SWAPDIR[@]}"; do
+    if [[ "${SWAPDIR}" =~ ^${d} ]]; then
+      echo
+      echo "ABORTING. Swap directory path cannot begin with: $(join_by ', ' ${BAD_SWAPDIR[@]})"
+      echo
+      usage
+      exit 1
+    fi
+  done
 else
   SWAPDIR="${DEF_SWAPDIR}"
 fi
