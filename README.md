@@ -1,6 +1,6 @@
 # fake-swapon
 
-Setup temporary virtual memory (swap) on CoreOS and CentOS Linux hosts.
+Setup temporary virtual memory (swap) on CoreOS, CentOS, and Ubuntu Linux.
 
 ## Why
 
@@ -80,9 +80,9 @@ all swap files before creating new ones.
 
 Before adding swap, __fake-swapon__ will attempt to detect if swap already exists. This is done by checking
 `/proc/meminfo`. If no swap is found, then __fake-swapon__ will attempt to create a swap file. On [CoreOS](https://coreos.com/)
-this will be accomplished via the [loop device](http://en.wikipedia.org/wiki/Loop_device); on [CentOS](http://www.centos.org/)
-the script will create a standard swap file (that is, without a loop device). Other Linux distributions are not
-currently supported.
+and [Ubuntu](https://www.ubuntu.com/) this will be accomplished via the [loop device](http://en.wikipedia.org/wiki/Loop_device);
+on [CentOS](http://www.centos.org/) the script will create a standard swap file (that is, without a loop device). Other
+Linux distributions are not currently supported.
 
 When swap already exists (either system swap or temporary fake swap), additional swap will not be added without
 prompting the user for confirmation. Prompting can be skipped with the `-f` option.
