@@ -6,7 +6,7 @@
 # Create and enable a swap file on Linux.
 #
 
-# Copyright (c) 2014 Mark Eissler, mark@mixtur.com
+# Copyright (c) 2014-2018 Mark Eissler, mark@mixtur.com
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -30,31 +30,30 @@ PATH=/usr/local/bin
 
 PATH_BNAME="/usr/bin/basename"
 PATH_GETOPT="/usr/bin/getopt"
-PATH_CAT="/usr/bin/cat"
-PATH_DD="/usr/bin/dd"
+PATH_CAT="/bin/cat"
+PATH_DD="/bin/dd"
 PATH_LS="/bin/ls"
-PATH_CHMOD="/usr/bin/chmod"
-PATH_MKDIR="/usr/bin/mkdir"
-PATH_RM="/usr/bin/rm"
+PATH_CHMOD="/bin/chmod"
+PATH_MKDIR="/bin/mkdir"
+PATH_RM="/bin/rm"
 PATH_STAT="/usr/bin/stat"
-PATH_SED="/usr/bin/sed"
+PATH_SED="/bin/sed"
 PATH_TR="/usr/bin/tr"
-PATH_UNAME="/usr/bin/uname"
+PATH_UNAME="/bin/uname"
 PATH_EXPR="/usr/bin/expr"
 PATH_AWK="/usr/bin/awk"
 
-PATH_MKSWAP="/usr/sbin/mkswap"
-PATH_SWAPON="/usr/sbin/swapon"
-PATH_SWAPOFF="/usr/sbin/swapoff"
+PATH_MKSWAP="/sbin/mkswap"
+PATH_SWAPON="/sbin/swapon"
+PATH_SWAPOFF="/sbin/swapoff"
 
 # Loop device support (required for CoreOS)
 #
-PATH_LOSETUP="/usr/sbin/losetup"
+PATH_LOSETUP="/sbin/losetup"
 
 # Swap directory
 #
 PATH_SWAPDIR="/root/swap"
-
 
 ###### NO SERVICABLE PARTS BELOW ######
 VERSION=2.0.1
@@ -603,7 +602,7 @@ addSwap() {
     echo "DEBUG: swapid_n: ${swapid_new}"
   fi
 
-  if [[ "${osconfig[NAME]}" =~ "CoreOS" ]]; then
+  if [[ "${osconfig[NAME]}" =~ "CoreOS" || "${osconfig[NAME]}" =~ "Ubuntu" ]]; then
     echo
     echo "Creating swap using the loop device method..."
     swapfile="${PATH_SWAPDIR}/lp.swap.${swapid_new}"
