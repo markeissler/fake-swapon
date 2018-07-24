@@ -6,7 +6,9 @@
 # Create and enable a swap file on Linux.
 #
 
-# Copyright (c) 2014 Mark Eissler, mark@mixtur.com
+# The MIT License (MIT)
+
+# Copyright (c) 2014-2018 Mark Eissler, mark@mixtur.com
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -30,31 +32,26 @@ PATH=/usr/local/bin
 
 PATH_BNAME="/usr/bin/basename"
 PATH_GETOPT="/usr/bin/getopt"
-PATH_CAT="/usr/bin/cat"
-PATH_DD="/usr/bin/dd"
+PATH_CAT="/bin/cat"
+PATH_DD="/bin/dd"
 PATH_LS="/bin/ls"
-PATH_CHMOD="/usr/bin/chmod"
-PATH_MKDIR="/usr/bin/mkdir"
-PATH_RM="/usr/bin/rm"
+PATH_CHMOD="/bin/chmod"
+PATH_MKDIR="/bin/mkdir"
+PATH_RM="/bin/rm"
 PATH_STAT="/usr/bin/stat"
-PATH_SED="/usr/bin/sed"
+PATH_SED="/bin/sed"
 PATH_TR="/usr/bin/tr"
-PATH_UNAME="/usr/bin/uname"
+PATH_UNAME="/bin/uname"
 PATH_EXPR="/usr/bin/expr"
 PATH_AWK="/usr/bin/awk"
 
-PATH_MKSWAP="/usr/sbin/mkswap"
-PATH_SWAPON="/usr/sbin/swapon"
-PATH_SWAPOFF="/usr/sbin/swapoff"
+PATH_MKSWAP="/sbin/mkswap"
+PATH_SWAPON="/sbin/swapon"
+PATH_SWAPOFF="/sbin/swapoff"
 
 # Loop device support (required for CoreOS)
 #
-PATH_LOSETUP="/usr/sbin/losetup"
-
-# Swap directory
-#
-PATH_SWAPDIR="/root/swap"
-
+PATH_LOSETUP="/sbin/losetup"
 
 ###### NO SERVICABLE PARTS BELOW ######
 VERSION=2.0.1
@@ -69,6 +66,7 @@ LISTSWAP=0
 REMOVESWAP=0
 SWAPIDLEN=6
 SWAPSIZE=-1
+SWAPDIR=""
 EMPTYSTR=""
 
 # min bash required
@@ -78,6 +76,10 @@ VERS_BASH_PATCH=0
 
 # defaults
 DEF_SWAPSIZE=1024
+DEF_SWAPDIR="/root/swap"
+
+# invalid swap directories, '/' will be added as well
+BAD_SWAPDIR=( /proc /tmp )
 
 # check for minimum bash
 if [[ ${BASH_VERSINFO[0]} < ${VERS_BASH_MAJOR} ||
@@ -110,6 +112,12 @@ basename() {
   fi
 }
 
+function join_by {
+  local __delim="${1}"; shift
+  local __string="${1}"; shift
+  printf "%s" "$__string${@/#/$__delim}"
+}
+
 function usage {
   if [ ${GETOPT_OLD} -eq 1 ]; then
     usage_old
@@ -120,9 +128,11 @@ function usage {
 
 function usage_new {
 ${PATH_CAT} << EOF
-usage: ${PROGNAME} [--debug] -l
+usage: ${PROGNAME} [--debug] -l [--swap-dir <swapdir>]
        ${PROGNAME} [--debug] [--force] --addswap [--swap-size <swapsize>]
+                   [--swap-dir <swapdir>]
        ${PROGNAME} [--debug] [--force] --remove-swap [--swap-id <swapid>]
+                   [--swap-dir <swapdir>]
 
 Add system virtual memory ("swap"). On file systems that don\'t support swap,
 the loop device will be used to create "fake" swap. The "add" and "remove"
@@ -134,6 +144,7 @@ OPTIONS:
    -l, --list-swap              List swap managed by fake-swap
    -r, --remove-swap            Remove swap managed by fake-swap from vm pool
    -s, --swap-size              Size (MB) of swap to add (use with --add-swap)
+   -w, --swap-dir               Swap working directory (default is ${DEF_SWAPDIR})
    -d, --debug                  Turn debugging on (increases verbosity)
    -f, --force                  Execute without user prompt
    -h, --help                   Show this message
@@ -141,6 +152,7 @@ OPTIONS:
 
 Adding swap:
   ${PROGNAME} [--debug] [--force] --addswap [--swap-size <swapsize>]
+              [--swap-dir <swapdir>]
 
 Optionally specify swap size (in MB) with the --swap-size flag. Otherwise,
 the default value (${DEF_SWAPSIZE}) will be used. Do not append units to the
@@ -148,6 +160,7 @@ specified value.
 
 Removing swap:
   ${PROGNAME} [--debug] [--force] --remove-swap [--swap-id <swapid>]
+              [--swap-dir <swapdir>]
 
 Optionally specify swap id with the --swap-id option to specifically unwire and
 remove a single swap file. Otherwise, all managed swap files will be unwired and
@@ -166,9 +179,9 @@ EOF
 #
 function usage_old {
 cat << EOF
-usage: ${PROGNAME} [-d] -l
-       ${PROGNAME} [-d] [-f] -a [-s <swapsize>]
-       ${PROGNAME} [-d] [-f] -r [-i <swapid>]
+usage: ${PROGNAME} [-d] -l [-w <swapdir>]
+       ${PROGNAME} [-d] [-f] -a [-s <swapsize>] [-w <swapdir>]
+       ${PROGNAME} [-d] [-f] -r [-i <swapid>] [-w <swapdir>]
 
 Add system virtual memory ("swap"). On file systems that don\'t support swap,
 the loop device will be used to create "fake" swap. The "add" and "remove"
@@ -180,20 +193,21 @@ OPTIONS:
    -l                           List swap managed by fake-swap
    -r                           Remove swap managed by fake-swap from vm pool
    -s                           Size (MB) of swap to add (use with -a)
+   -w                           Swap working directory (default is ${DEF_SWAPDIR})
    -d                           Turn debugging on (increases verbosity)
    -f                           Execute without user prompt
    -h                           Show this message
    -v                           Output version of this script
 
 Adding swap:
-  ${PROGNAME} [-d] [-f] -a [-s <swapsize>]
+  ${PROGNAME} [-d] [-f] -a [-s <swapsize>] [-w <swapdir>]
 
 Optionally specify swap size (in MB) with the -s (swap size) flag. Otherwise,
 the default value (${DEF_SWAPSIZE}) will be used. Do not append units to the
 specified value.
 
 Removing swap:
-  ${PROGNAME} [-d] [-f] -r [-i <swapid>]
+  ${PROGNAME} [-d] [-f] -r [-i <swapid>] [-w <swapdir>]
 
 Optionally specify swap id with the -i (swap-id) option to specifically unwire
 and remove a single swap file. Otherwise, all managed swap files will be unwired
@@ -301,7 +315,7 @@ getSwapList() {
 
   # suppress empty swapdir listing errors, check to see iif we have any swap at
   # all; if not, just bail out now!
-  resp=$({ ${PATH_LS} -d1 ${PATH_SWAPDIR}/*; } 2>&1)
+  resp=$({ ${PATH_LS} -d1 ${SWAPDIR}/*; } 2>&1)
   rslt=$?
   if [[ rslt -ne 0 ]]; then
     if [ "${DEBUG}" -ne 0 ]; then
@@ -425,7 +439,7 @@ getSwapList() {
         fi
       fi
     fi
-  done <<< "$(${PATH_LS} -s -d1 ${PATH_SWAPDIR}/*)"
+  done <<< "$(${PATH_LS} -s -d1 ${SWAPDIR}/*)"
 }
 
 # getUniqStr()
@@ -572,14 +586,14 @@ addSwap() {
   fi
 
   # make the swap directory
-  resp=$({ ${PATH_MKDIR} -p "${PATH_SWAPDIR}"; } 2>&1)
+  resp=$({ ${PATH_MKDIR} -p "${SWAPDIR}"; } 2>&1)
   rslt=$?
   if [ $? -ne 0 ]; then
     echo "ABORTING. Unable to create swap directory."
     echo
     exit 1
   else
-    resp=$({ ${PATH_CHMOD} 0700 "${PATH_SWAPDIR}"; } 2>&1)
+    resp=$({ ${PATH_CHMOD} 0700 "${SWAPDIR}"; } 2>&1)
     rslt=$?
     if [ $? -ne 0 ]; then
       echo "ABORTING. Unable to adjust permissions on swap directory."
@@ -603,10 +617,10 @@ addSwap() {
     echo "DEBUG: swapid_n: ${swapid_new}"
   fi
 
-  if [[ "${osconfig[NAME]}" =~ "CoreOS" ]]; then
+  if [[ "${osconfig[NAME]}" =~ "CoreOS" || "${osconfig[NAME]}" =~ "Ubuntu" ]]; then
     echo
     echo "Creating swap using the loop device method..."
-    swapfile="${PATH_SWAPDIR}/lp.swap.${swapid_new}"
+    swapfile="${SWAPDIR}/lp.swap.${swapid_new}"
     swapdev=$(${PATH_LOSETUP} -f)
     # check if a swapfile already exists, if not, create it
     resp=$(${PATH_STAT} ${swapfile} &> /dev/null)
@@ -634,7 +648,7 @@ addSwap() {
   elif [[ "${osconfig[NAME]}" =~ "CentOS" ]]; then
     echo
     echo "Creating swap using the file system method..."
-    swapfile="${PATH_SWAPDIR}/wd.swap.${swapid_new}"
+    swapfile="${SWAPDIR}/wd.swap.${swapid_new}"
     swapdev=${swapfile}
     # check if a swapfile already exists, if not, create it
     resp=$(${PATH_STAT} ${swapfile} &> /dev/null)
@@ -964,6 +978,7 @@ readconfig() {
 #   --list-swap, l
 #   --remove-swap, r
 #   --swap-size, s
+#   --swap-dir, w
 #   --debug, d
 #   --force, f
 #   --help, h
@@ -974,12 +989,12 @@ ${PATH_GETOPT} -T > /dev/null
 if [ $? -eq 4 ]; then
   # GNU enhanced getopt is available
   PROGNAME=$(${PATH_BNAME} $0)
-  params="$(${PATH_GETOPT} --name "$PROGNAME" --long add-swap,swap-id:,list-swap,remove-swap,swap-size:,force,help,version,debug --options ai:lrs:fhvd -- "$@")"
+  params="$(${PATH_GETOPT} --name "$PROGNAME" --long add-swap,swap-id:,list-swap,remove-swap,swap-size:,swap-dir:,force,help,version,debug --options ai:lrs:w:fhvd -- "$@")"
 else
   # Original getopt is available
   GETOPT_OLD=1
   PROGNAME=$(${PATH_BNAME} $0)
-  params="$(${PATH_GETOPT} ai:lrs:fhvd "$@")"
+  params="$(${PATH_GETOPT} ai:lrs:w:fhvd "$@")"
 fi
 
 # check for invalid params passed; bail out if error is set.
@@ -1016,7 +1031,7 @@ while [ $# -gt 0 ]; do
       shift;
       ;;
     -l | --list-swap)
-      if [[ ( ${params_count} -eq 3 && ${DEBUG} -eq 0 ) || ( ${params_count} -gt 3 ) ]]; then
+      if [[ ( ${params_count} -eq 3 && ${DEBUG} -eq 0 ) || ( ${params_count} -gt 5  && -z ${SWAPDIR} ) ]]; then
         if [ "${DEBUG}" -ne 0 ]; then
           echo "-l option with additional options";
         fi
@@ -1044,6 +1059,10 @@ while [ $# -gt 0 ]; do
         exit 1;
       fi
       cli_SWAPSIZE="$2";
+      shift;
+      ;;
+    -w | --swap-dir)
+      cli_SWAPDIR="$2";
       shift;
       ;;
     -d | --debug)
@@ -1159,6 +1178,33 @@ if [ -n "${cli_SWAPSIZE}" ]; then
     usage
     exit 1
   fi
+fi
+
+if [ -n "${cli_SWAPDIR}" ]; then
+  SWAPDIR="${cli_SWAPDIR}"
+  if [ "${DEBUG}" -ne 0 ]; then
+    echo "DEBUG:  swapdir: ${SWAPDIR}"
+  fi
+  # swap cannot be added at the root directory level
+  if [[ "${SWAPDIR}" == '/' ]]; then
+      echo
+      echo "ABORTING. Swap directory path cannot be placed at root level!"
+      echo
+      usage
+      exit 1
+  fi
+  # swap cannot be added to a list of additional directories
+  for d in "${BAD_SWAPDIR[@]}"; do
+    if [[ "${SWAPDIR}" =~ ^${d} ]]; then
+      echo
+      echo "ABORTING. Swap directory path cannot begin with: $(join_by ', ' ${BAD_SWAPDIR[@]})"
+      echo
+      usage
+      exit 1
+    fi
+  done
+else
+  SWAPDIR="${DEF_SWAPDIR}"
 fi
 
 # check system compatibility
